@@ -17,7 +17,7 @@ void* new_page(uint32_t id) {
     return page;
 }
 
-void add_tuple(void* page, void* tuple, uint16_t tuple_size) {
+TuplePtr* add_tuple(void* page, void* tuple, uint16_t tuple_size) {
     Header* header = PAGE_HEADER(page);
     if (header->free_total < tuple_size + sizeof(TuplePtr)) {
 	printf("Page is full, tuple insertion failed.\n");
@@ -34,6 +34,8 @@ void add_tuple(void* page, void* tuple, uint16_t tuple_size) {
     header->free_start += sizeof(TuplePtr);
     header->free_end -= tuple_ptr->size;
     header->free_total = header->free_end - header->free_start;
+
+    return tuple_ptr;
 }
 
 void remove_tuple(void* page, uint16_t tuple_idx) {

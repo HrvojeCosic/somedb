@@ -37,7 +37,8 @@ typedef struct TuplePtrList {
 
 void* new_page(uint32_t id);
 void* get_tuple(void* page, uint16_t tuple_index);
-void add_tuple(void* page, void* tuple, uint16_t tuple_size);
+TuplePtr* add_tuple(void* page, void* tuple, uint16_t tuple_size);
+TuplePtrList get_tuple_ptr_list(void *page);
 void remove_tuple(void* page, uint16_t tuple_idx);
 void defragment(void* page);
 void write_page(void* page, uint32_t fd);
