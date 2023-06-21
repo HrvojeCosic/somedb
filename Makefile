@@ -20,21 +20,21 @@ TESTBINS=$(patsubst $(TEST)/%.c, $(TEST)/bin/%, $(TESTS))
 all: $(BINARY)
 
 $(BINARY): $(OFILES)
-	$(CC) -o $@ $^
+	$(CC) -o $@ $<
 
-%.o:%.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 test: $(TEST)/bin $(TESTBINS)
 	@for test in $(TESTBINS) ; do ./$$test ; done
 
-$(TEST)/bin/%: $(TEST)/%.c
-	$(CC) $(CFLAGS) -o $@ $^ $(filter-out src/main.c,$(CFILES)) $(TESTFLAGS)
+$(TEST)/bin/%: $(TEST)/%.c $(CFILES)
+	$(CC) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(TESTFLAGS)
 
 $(TEST)/bin:
 	mkdir $@
 
 clean:
-	rm -rf $(BINARY) $(OFILES) $(DEPFILES) $(TEST)/bin
+	rm -rf $(BINARY) $(OFILES) $(DEPFILES) $(TEST)/bin $(TESTBINS)
 
 -include $(DEPFILES)
