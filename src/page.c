@@ -71,7 +71,9 @@ void defragment(void *page) {
 	return;
     }
 
-    Header *temp = PAGE_HEADER(new_page(1));
+    void *temp = new_page(1);
+    Header *temp_header = PAGE_HEADER(temp);
+
     TuplePtrList tuple_ptr_list = get_tuple_ptr_list(page);
 
 
@@ -84,13 +86,12 @@ void defragment(void *page) {
 	    add_tuple(temp, page + curr_tuple_ptr->start_offset, curr_tuple_ptr->size);
 	}
     }
-
-    page_header->free_start = temp->free_start;
-    page_header->free_end = temp->free_end;
-    page_header->free_total = temp->free_total;
+    page_header->free_start = temp_header->free_start;
+    page_header->free_end = temp_header->free_end;
+    page_header->free_total = temp_header->free_total;
     page_header->flags &= ~COMPACTABLE;
 
-    memcpy(page + sizeof(Header), temp + sizeof(Header), PAGE_SIZE - sizeof(Header));
+    memcpy(PAGE_NO_HEADER(page), PAGE_NO_HEADER(temp), PAGE_SIZE - sizeof(Header));
     free(temp);
 }
 

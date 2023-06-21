@@ -4,10 +4,22 @@
 
 #define PAGE_SIZE 4096
 
-#define TUPLE_INDEX_TO_POINTER_OFFSET(idx) \
-    sizeof(Header) + (idx * sizeof(TuplePtr));
 
-// Header flags
+/*
+ * Pointer to the page memory after it's header
+ */
+#define PAGE_NO_HEADER(page) \
+    page + sizeof(Header)
+
+/*
+ * Pointer to the start of tuple of index idx
+ */
+#define TUPLE_INDEX_TO_POINTER_OFFSET(idx) \
+    sizeof(Header) + (idx * sizeof(TuplePtr))
+
+/*
+ * Page header flags
+ */
 #define COMPACTABLE (1 << 7)
 
 typedef struct Header {

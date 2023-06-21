@@ -1,6 +1,8 @@
 #include <check.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include "../include/page.h"
 
 typedef struct Customer {
@@ -8,26 +10,18 @@ typedef struct Customer {
     int age;
 } Customer;
 
-START_TEST(test_new_page) 
+START_TEST(page)
 {
-    void* page = new_page(0);
-    Header* header = PAGE_HEADER(page);
-    ck_assert_int_eq(header->id, 0);
-    free(page);
-
-    page = new_page(1);
-    header = PAGE_HEADER(page);
-    ck_assert_int_eq(header->id, 1);
-    free(page);
-}
-
-START_TEST(test_tuple)
-{
+    /*
+     * ADD PAGE
+     */
     const uint32_t id = 0;
     void* page = new_page(id);
     Header* header = PAGE_HEADER(page);
 
-    // ADD TUPLE
+    /*
+     * ADD TUPLE
+     */
     Customer c1 = {.name="Bob", .age=27};
     Customer c2 = {.name="Alice", .age=32};
 
@@ -38,25 +32,45 @@ START_TEST(test_tuple)
     ck_assert_str_eq(c1_add->name, "Bob");
     ck_assert_int_eq(c1_add->age, 27);
 
-    // GET TUPLE
+    /*
+     * GET TUPLE
+     */
     Customer* c2_get = get_tuple(page, 1);
     ck_assert_str_eq(c2_get->name, "Alice");
     ck_assert_int_eq(c2_get->age, 32);
 
-    //REMOVE TUPLE
-    remove_tuple(page, 0);
-    ck_assert_ptr_null(get_tuple(page, 0));
+    /*
+     * REMOVE TUPLE
+     */
+    uint32_t tid = 0;
+    remove_tuple(page, tid);
+    ck_assert_ptr_null(get_tuple(page, tid));
     ck_assert_int_eq(c1_ptr->start_offset, 0);
     ck_assert_int_eq(header->flags, COMPACTABLE);
     ck_assert_int_eq(get_tuple_ptr_list(page).length, 2);
 
-    //DEFRAGMENT
+    /*
+     * DEFRAGMENT
+     * After defragmenting, the removed tuple memory should be freed
+     */
     uint16_t total_before = header->free_total;
     defragment(page);
-    ck_assert_int_eq(c1_add->age, 0);
-    ck_assert_int_eq(*c1_add->name, 0); 
+    ck_assert_int_eq(c2_get->age, 0);
+    ck_assert_int_eq(*c2_get->name, 0); 
     ck_assert_int_eq(header->free_total, total_before + sizeof(Customer) + sizeof(TuplePtr));
     ck_assert_int_eq(get_tuple_ptr_list(page).length, 1);
+
+    /*
+     * DISK PERSISTENCE
+     */
+    char filename[20] = "test_page.txt";
+    int fd = open(filename, O_RDWR | O_CREAT);
+    write_page(page, fd);
+    void* rp = read_page(id, fd);
+    remove(filename); // remove now in case assert fails
+    Customer* rc = get_tuple(rp, 0);
+    ck_assert_str_eq(rc->name, "Alice");
+    ck_assert_int_eq(rc->age, 32);
 
     free(page);
 }
@@ -71,8 +85,7 @@ Suite* page_suite(void)
     
     tc_core = tcase_create("Core");
 
-    tcase_add_test(tc_core, test_tuple);
-    tcase_add_test(tc_core, test_new_page);
+    tcase_add_test(tc_core, page);
     suite_add_tcase(s, tc_core);
 
     return s;
