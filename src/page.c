@@ -1,8 +1,8 @@
 #include "../include/page.h"
-#include <string.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 void *new_page(uint32_t id) {
@@ -20,8 +20,8 @@ void *new_page(uint32_t id) {
 TuplePtr *add_tuple(void *page, void *tuple, uint16_t tuple_size) {
     Header *header = PAGE_HEADER(page);
     if (header->free_total < tuple_size + sizeof(TuplePtr)) {
-	printf("Page is full, tuple insertion failed.\n");
-	return NULL;
+        printf("Page is full, tuple insertion failed.\n");
+        return NULL;
     }
 
     TuplePtr *tuple_ptr = page + header->free_start;
@@ -50,7 +50,7 @@ void *get_tuple(void *page, uint16_t tuple_idx) {
     TuplePtr *tuple_ptr = page + TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx);
 
     if (tuple_ptr->start_offset == 0) {
-	return NULL;
+        return NULL;
     }
 
     return page + tuple_ptr->start_offset;
@@ -68,7 +68,7 @@ void defragment(void *page) {
     Header *page_header = PAGE_HEADER(page);
 
     if ((page_header->flags & COMPACTABLE) == 0) {
-	return;
+        return;
     }
 
     void *temp = new_page(1);
@@ -76,22 +76,23 @@ void defragment(void *page) {
 
     TuplePtrList tuple_ptr_list = get_tuple_ptr_list(page);
 
-
     TuplePtr *curr_tuple_ptr;
     for (int i = 0; i < tuple_ptr_list.length; i++) {
-	curr_tuple_ptr = tuple_ptr_list.start + i;
+        curr_tuple_ptr = tuple_ptr_list.start + i;
 
-	// Removed tuples' offsets are 0
-	if (curr_tuple_ptr->start_offset != 0) {
-	    add_tuple(temp, page + curr_tuple_ptr->start_offset, curr_tuple_ptr->size);
-	}
+        // Removed tuples' offsets are 0
+        if (curr_tuple_ptr->start_offset != 0) {
+            add_tuple(temp, page + curr_tuple_ptr->start_offset,
+                      curr_tuple_ptr->size);
+        }
     }
     page_header->free_start = temp_header->free_start;
     page_header->free_end = temp_header->free_end;
     page_header->free_total = temp_header->free_total;
     page_header->flags &= ~COMPACTABLE;
 
-    memcpy(PAGE_NO_HEADER(page), PAGE_NO_HEADER(temp), PAGE_SIZE - sizeof(Header));
+    memcpy(PAGE_NO_HEADER(page), PAGE_NO_HEADER(temp),
+           PAGE_SIZE - sizeof(Header));
     free(temp);
 }
 
@@ -103,7 +104,7 @@ void write_page(void *page, uint32_t fd) {
     int f = fsync(fd);
 
     if (s == -1 || w == -1 || f == -1) {
-	printf("I/O error while writing page\n");
+        printf("I/O error while writing page\n");
     }
 }
 
@@ -112,20 +113,20 @@ void *read_page(uint32_t page_id, uint32_t fd) {
 
     int offset = page_id * PAGE_SIZE;
     if (offset > PAGE_SIZE) {
-	printf("I/O error, reading past EOF\n");
-	exit(1);
+        printf("I/O error, reading past EOF\n");
+        exit(1);
     }
 
     int s = lseek(fd, offset, SEEK_SET);
     int r = read(fd, page, PAGE_SIZE);
 
     if (s == -1 || r == -1) {
-	printf("I/O error while reading specified page\n");
-	exit(1);
+        printf("I/O error while reading specified page\n");
+        exit(1);
     }
 
     if (r < PAGE_SIZE) {
-	printf("Read less than a page size\n");
+        printf("Read less than a page size\n");
     }
 
     return page;

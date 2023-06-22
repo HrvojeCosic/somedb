@@ -4,14 +4,16 @@
 #include <cstdint>
 
 typedef struct ClockReplacer {
-    size_t num_pages; // max number of pages ClockReplacer is required to store
-    void  *frames; // frames tracked by ClockReplacer
+    size_t num_pages;  // max number of pages ClockReplacer is required to store
+    void *frames;      // frames tracked by ClockReplacer
     void *frame_table; // to map each frame to its reference bit
-    void *hand; // current position of the clock h
+    void *hand;        // current position of the clock h
 } ClockReplacer;
 
 /**
- * Finds the frame closest to the clock hand that is both in the ClockReplacer and with its ref flag set to false. If its ref flag is set to true, sets it to false without returning.
+ * Finds the frame closest to the clock hand that is both in the ClockReplacer
+ * and with its ref flag set to false. If its ref flag is set to true, sets it
+ * to false without returning.
  */
 uint32_t *victim();
 

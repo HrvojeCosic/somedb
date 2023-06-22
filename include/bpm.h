@@ -6,9 +6,9 @@
 
 typedef struct BufferPoolManager {
     const size_t pool_size; // max number of pages in the buffer pool
-    void *pages; // array of pages in the buffer pool
-    void *page_table; // map pages in the buffer pool to its frames
-    void *free_list; // list of available frames
+    void *pages;            // array of pages in the buffer pool
+    void *page_table;       // map pages in the buffer pool to its frames
+    void *free_list;        // list of available frames
 } BufferPoolManager;
 
 typedef struct BufferPoolManagerPage {
@@ -18,9 +18,8 @@ typedef struct BufferPoolManagerPage {
     bool is_dirty;
 } BpmPage;
 
-
-/* 
- * Initiates a new buffer pool manager and returns a pointer to it 
+/*
+ * Initiates a new buffer pool manager and returns a pointer to it
  */
 BufferPoolManager *new_bpm(size_t pool_size);
 
@@ -34,21 +33,20 @@ void *get_pages();
  */
 size_t get_pool_size();
 
-
 /**
- * Unpin page of page_id from the buffer pool and returns true. If the provided page does not exist, return false.
- * Sets page's dirty bit to value provided in is_dirty
+ * Unpin page of page_id from the buffer pool and returns true. If the provided
+ * page does not exist, return false. Sets page's dirty bit to value provided in
+ * is_dirty
  */
 bool unpin_page(uint32_t page_id, bool is_dirty);
-
 
 /**
  * Flush provided page to disk, regardless of its dirty bit
  * Unsets the provided page's dirty bit afterwards
- * Returns false if the page could not be found in the page table, true otherwise
+ * Returns false if the page could not be found in the page table, true
+ * otherwise
  */
 bool flush_page(uint32_t page_id);
-
 
 /**
  * Flush all pages in the buffer pool to disk
@@ -56,7 +54,7 @@ bool flush_page(uint32_t page_id);
 void flush_all_pages();
 
 /*
- * Removes a page from the buffer pool and returns true. 
+ * Removes a page from the buffer pool and returns true.
  * If the page with provided page_id is pinned, returns false.
  */
 bool delete_bpm_page(uint32_t page_id);
@@ -69,8 +67,8 @@ bool delete_bpm_page(uint32_t page_id);
 BpmPage *new_bpm_page();
 
 /*
- * Returns the requested page from the buffer pool, or returns a null pointer if page needs to be fetched from disk but no frames are available or evictable.
+ * Returns the requested page from the buffer pool, or returns a null pointer if
+ * page needs to be fetched from disk but no frames are available or evictable.
  * Writes a possible replacement frame back to disk if it contains a dirty page
  */
 BpmPage *fetch_bpm_page(uint32_t page_id);
-

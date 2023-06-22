@@ -10,12 +10,15 @@ DEPFLAGS=-MP -MD
 CFLAGS=-Wall -Wextra -Wno-missing-braces -g $(foreach DIR,$(INCDIRS),-I$(DIR)) $(OPT) $(DEPFLAGS)
 TESTFLAGS=-lcheck -lsubunit -lm
 
+CMDFORMAT=$(shell find . -iname '*.h' -o -iname '*.c' | xargs clang-format -i)
+
 CFILES=$(foreach DIR,$(CODEDIRS),$(wildcard $(DIR)/*.c))
 OFILES=$(patsubst %.c,%.o,$(CFILES))
 DEPFILES=$(patsubst %.c,%.d,$(CFILES))
 
 TESTS=$(wildcard $(TEST)/*.c)
 TESTBINS=$(patsubst $(TEST)/%.c, $(TEST)/bin/%, $(TESTS))
+
 
 all: $(BINARY)
 
@@ -36,5 +39,19 @@ $(TEST)/bin:
 
 clean:
 	rm -rf $(BINARY) $(OFILES) $(DEPFILES) $(TEST)/bin $(TESTBINS)
+
+diff:
+	$(CMDFORMAT)
+	@git diff
+	@git status
+
+commit:
+	@if [ -z "$(m)" ]; then \
+		echo "param 'm' is not provided. Run: make commit m='My comment'"; \
+		exit 1; \
+	fi
+	git add .
+	git commit -m "$(m)"
+	git push
 
 -include $(DEPFILES)
