@@ -8,7 +8,7 @@ OPT=-O0
 #Generate files including make rules for .h deps
 DEPFLAGS=-MP -MD 
 CFLAGS=-Wall -Wextra -Wno-missing-braces -g $(foreach DIR,$(INCDIRS),-I$(DIR)) $(OPT) $(DEPFLAGS)
-TESTFLAGS=-lcheck -lsubunit -lm
+TESTFLAGS=-lcheck -lsubunit -lm -fsanitize=thread -ltsan
 
 CMDFORMAT=$(shell find . -iname '*.h' -o -iname '*.c' | xargs clang-format -i)
 

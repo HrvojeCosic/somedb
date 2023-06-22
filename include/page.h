@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shared.h"
 #include <stdint.h>
 
 #define PAGE_SIZE 4096
@@ -26,6 +27,7 @@ typedef struct Header {
     uint16_t free_end;   // offset to end of available page memory
     uint16_t free_total; // total available page memory
     uint8_t flags;
+    RWLOCK latch;
 } Header;
 
 typedef struct TuplePtr {
@@ -37,6 +39,15 @@ typedef struct TuplePtrList {
     TuplePtr *start; // pointer to the beginning of tuple pointers in a page
     uint16_t length; // number of tuple pointers in a page
 } TuplePtrList;
+
+/*
+ * Type of argument for add_tuple
+ */
+typedef struct AddTupleArgs {
+    void *page;
+    void *tuple;
+    uint16_t tuple_size;
+} AddTupleArgs;
 
 #define PAGE_HEADER(page) (Header *)page
 
@@ -84,7 +95,7 @@ void *read_page(uint32_t page_id, uint32_t fd);
  * Adds given tuple to the given page and returns a pointer to beginning of
  * added tuple. If the page is full, immediately returns a null pointer
  */
-TuplePtr *add_tuple(void *page, void *tuple, uint16_t tuple_size);
+TuplePtr *add_tuple(void *data);
 
 /*
  * Returns information about tuple pointers at the specified page contained in

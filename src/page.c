@@ -1,4 +1,5 @@
 #include "../include/page.h"
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,18 +8,27 @@
 
 void *new_page(uint32_t id) {
     void *page = malloc(PAGE_SIZE);
+    RWLOCK latch;
+    RWLOCK_INIT(&latch);
 
     Header *header = PAGE_HEADER(page);
     header->id = id;
     header->free_end = PAGE_SIZE - 1;
     header->free_start = sizeof(Header);
     header->free_total = header->free_end - header->free_start;
+    header->latch = latch;
 
     return page;
 }
 
-TuplePtr *add_tuple(void *page, void *tuple, uint16_t tuple_size) {
+TuplePtr *add_tuple(void *data) {
+    AddTupleArgs *data_args = data;
+    void *page = data_args->page;
+    uint16_t tuple_size = data_args->tuple_size;
+    void *tuple = data_args->tuple;
+
     Header *header = PAGE_HEADER(page);
+    RWLOCK_WRLOCK(&header->latch);
     if (header->free_total < tuple_size + sizeof(TuplePtr)) {
         printf("Page is full, tuple insertion failed.\n");
         return NULL;
@@ -35,6 +45,7 @@ TuplePtr *add_tuple(void *page, void *tuple, uint16_t tuple_size) {
     header->free_end -= tuple_ptr->size;
     header->free_total = header->free_end - header->free_start;
 
+    RWLOCK_UNLOCK(&header->latch);
     return tuple_ptr;
 }
 
@@ -82,8 +93,10 @@ void defragment(void *page) {
 
         // Removed tuples' offsets are 0
         if (curr_tuple_ptr->start_offset != 0) {
-            add_tuple(temp, page + curr_tuple_ptr->start_offset,
-                      curr_tuple_ptr->size);
+            AddTupleArgs t_args = {.page = temp,
+                                   .tuple = page + curr_tuple_ptr->start_offset,
+                                   .tuple_size = curr_tuple_ptr->size};
+            add_tuple(&t_args);
         }
     }
     page_header->free_start = temp_header->free_start;

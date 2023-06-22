@@ -5,12 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct Customer {
-    char name[30];
-    int age;
-} Customer;
+typedef struct TupleExample {
+    int x;
+    char y[30];
+} TupleExample;
 
 START_TEST(page) {
+    pthread_t t1, t2;
+
     /*
      * ADD PAGE
      */
@@ -21,22 +23,23 @@ START_TEST(page) {
     /*
      * ADD TUPLE
      */
-    Customer c1 = {.name = "Bob", .age = 27};
-    Customer c2 = {.name = "Alice", .age = 32};
-
-    TuplePtr *c1_ptr = add_tuple(page, &c1, sizeof(Customer));
-    add_tuple(page, &c2, sizeof(Customer));
-
-    Customer *c1_add = page + c1_ptr->start_offset;
-    ck_assert_str_eq(c1_add->name, "Bob");
-    ck_assert_int_eq(c1_add->age, 27);
+    TupleExample t_ex1 = {.y = "str1", .x = 1};
+    TupleExample t_ex2 = {.y = "str2", .x = 2};
+    AddTupleArgs t_args1 = {
+        .page = page, .tuple = &t_ex1, .tuple_size = sizeof(TupleExample)};
+    AddTupleArgs t_args2 = {
+        .page = page, .tuple = &t_ex2, .tuple_size = sizeof(TupleExample)};
+    pthread_create(&t1, NULL, (void *)add_tuple, &t_args1);
+    pthread_create(&t2, NULL, (void *)add_tuple, &t_args2);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
 
     /*
      * GET TUPLE
      */
-    Customer *c2_get = get_tuple(page, 1);
-    ck_assert_str_eq(c2_get->name, "Alice");
-    ck_assert_int_eq(c2_get->age, 32);
+    TupleExample *t2_get = get_tuple(page, 1);
+    ck_assert_str_eq(t2_get->y, "str2");
+    ck_assert_int_eq(t2_get->x, 2);
 
     /*
      * REMOVE TUPLE
@@ -44,7 +47,6 @@ START_TEST(page) {
     uint32_t tid = 0;
     remove_tuple(page, tid);
     ck_assert_ptr_null(get_tuple(page, tid));
-    ck_assert_int_eq(c1_ptr->start_offset, 0);
     ck_assert_int_eq(header->flags, COMPACTABLE);
     ck_assert_int_eq(get_tuple_ptr_list(page).length, 2);
 
@@ -54,10 +56,10 @@ START_TEST(page) {
      */
     uint16_t total_before = header->free_total;
     defragment(page);
-    ck_assert_int_eq(c2_get->age, 0);
-    ck_assert_int_eq(*c2_get->name, 0);
+    ck_assert_int_eq(t2_get->x, 0);
+    ck_assert_int_eq(*t2_get->y, 0);
     ck_assert_int_eq(header->free_total,
-                     total_before + sizeof(Customer) + sizeof(TuplePtr));
+                     total_before + sizeof(TupleExample) + sizeof(TuplePtr));
     ck_assert_int_eq(get_tuple_ptr_list(page).length, 1);
 
     /*
@@ -68,9 +70,9 @@ START_TEST(page) {
     write_page(page, fd);
     void *rp = read_page(id, fd);
     remove(filename); // remove now in case assert fails
-    Customer *rc = get_tuple(rp, 0);
-    ck_assert_str_eq(rc->name, "Alice");
-    ck_assert_int_eq(rc->age, 32);
+    TupleExample *rc = get_tuple(rp, 0);
+    ck_assert_str_eq(rc->y, "str2");
+    ck_assert_int_eq(rc->x, 2);
 
     free(page);
 }
@@ -98,6 +100,7 @@ int main(void) {
     s = page_suite();
     sr = srunner_create(s);
 
+    srunner_set_fork_status(sr, CK_NOFORK);
     srunner_run_all(sr, CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
     srunner_free(sr);
