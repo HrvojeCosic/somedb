@@ -1,4 +1,4 @@
-#include "../include/page.h"
+#include "../include/disk_manager.h"
 #include <check.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -64,13 +64,11 @@ START_TEST(page) {
 
     /*
      * DISK PERSISTENCE
-     * TOOD: ALLOW MULTIPLE FILES
      */
-    char filename[20] = "test_page.txt";
-    int fd = open(filename, O_RDWR | O_CREAT);
+    int fd = db_file();
     write_page(page, fd);
     void *rp = read_page(id, fd);
-    remove(filename); // remove now in case assert fails
+    shut_down_db(); // remove now in case assert fails
     TupleExample *rc = get_tuple(rp, 0);
     ck_assert_str_eq(rc->y, "str2");
     ck_assert_int_eq(rc->x, 2);

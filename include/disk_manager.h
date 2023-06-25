@@ -17,12 +17,17 @@
     sizeof(Header) + (idx * sizeof(TuplePtr))
 
 /*
+ * Pointer to the start of page header
+ */
+#define PAGE_HEADER(page) (Header *)page
+
+/*
  * Page header flags
  */
 #define COMPACTABLE (1 << 7)
 
 typedef struct Header {
-    uint32_t id;
+    page_id_t id;
     uint16_t free_start; // offset to beginning of available page memory
     uint16_t free_end;   // offset to end of available page memory
     uint16_t free_total; // total available page memory
@@ -49,15 +54,22 @@ typedef struct AddTupleArgs {
     uint16_t tuple_size;
 } AddTupleArgs;
 
-#define PAGE_HEADER(page) (Header *)page
+/*
+ * Creates a database file if it doesn't already exist.
+ * Returns a file descriptor of a database file
+ */
+int db_file();
 
-#define TUPLE_PTR(position) (TuplePtr *)position
+/*
+ * Closes a database
+ */
+void shut_down_db();
 
 /*
  * Allocates memory for a new page of the given id and returns a pointer to it's
  * beginning
  */
-void *new_page(uint32_t id);
+void *new_page(page_id_t id);
 
 /*
  * Returns a pointer to the beginning of the tuple with the given index at the
@@ -89,7 +101,7 @@ void write_page(void *page, uint32_t fd);
  * specified file descriptor fd into memory and returns a pointer to its
  * beginning
  */
-void *read_page(uint32_t page_id, uint32_t fd);
+void *read_page(page_id_t id, uint32_t fd);
 
 /*
  * Adds given tuple to the given page and returns a pointer to beginning of

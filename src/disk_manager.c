@@ -1,4 +1,5 @@
-#include "../include/page.h"
+#include "../include/disk_manager.h"
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -6,7 +7,16 @@
 #include <string.h>
 #include <unistd.h>
 
-void *new_page(uint32_t id) {
+#define DBFILE "dbfile.txt" // name of database file
+
+int db_file() {
+    int fd = open(DBFILE, O_CREAT | O_EXCL | O_RDWR);
+    return fd;
+}
+
+void shut_down_db() { remove(DBFILE); }
+
+void *new_page(page_id_t id) {
     void *page = malloc(PAGE_SIZE);
     RWLOCK latch;
     RWLOCK_INIT(&latch);
@@ -121,7 +131,7 @@ void write_page(void *page, uint32_t fd) {
     }
 }
 
-void *read_page(uint32_t page_id, uint32_t fd) {
+void *read_page(page_id_t page_id, uint32_t fd) {
     void *page = malloc(PAGE_SIZE);
 
     int offset = page_id * PAGE_SIZE;

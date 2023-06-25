@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shared.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -15,19 +16,19 @@ typedef struct ClockReplacer {
  * and with its ref flag set to false. If its ref flag is set to true, sets it
  * to false without returning.
  */
-uint32_t *victim();
+frame_id_t *victim();
 
 /**
  * Removes provided frame containing the pinned page from the ClockReplacer
  * Should be called when the page is pinned to a frame in the BufferPoolManager.
  */
-void pin(uint32_t frame_id);
+void pin(frame_id_t frame_id);
 
 /**
  * Adds provided frame containing the unpinned page to the ClockReplacer
  * Should be called when page's pin count becomes 0
  */
-void unpint(uint32_t frame_id);
+void unpint(frame_id_t frame_id);
 
 /**
  * Returns the number of frames currently in the ClockReplacer

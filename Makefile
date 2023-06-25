@@ -1,4 +1,5 @@
 BINARY=bin
+DBFILE=dbfile.txt
 CODEDIRS=. src
 INCDIRS=. ./include
 TEST=test
@@ -38,7 +39,7 @@ $(TEST)/bin:
 	mkdir $@
 
 clean:
-	rm -rf $(BINARY) $(OFILES) $(DEPFILES) $(TEST)/bin $(TESTBINS)
+	rm -rf $(BINARY) $(OFILES) $(DEPFILES) $(TEST)/bin $(TESTBINS) $(DBFILE)
 
 diff:
 	$(CMDFORMAT)

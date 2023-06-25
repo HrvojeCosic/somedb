@@ -16,7 +16,6 @@ START_TEST(buffer_pool_manager) {
         ck_assert_int_eq(bpm->free_list[i], true);
     }
 
-
     /*
      * UNPIN PAGE
      */
