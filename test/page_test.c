@@ -64,6 +64,7 @@ START_TEST(page) {
 
     /*
      * DISK PERSISTENCE
+     * TOOD: ALLOW MULTIPLE FILES
      */
     char filename[20] = "test_page.txt";
     int fd = open(filename, O_RDWR | O_CREAT);

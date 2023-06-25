@@ -23,7 +23,7 @@ TESTBINS=$(patsubst $(TEST)/%.c, $(TEST)/bin/%, $(TESTS))
 all: $(BINARY)
 
 $(BINARY): $(OFILES)
-	$(CC) -o $@ $<
+	$(CC) -o $@ $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
