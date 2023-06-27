@@ -10,11 +10,11 @@
 #define DBFILE "dbfile.txt" // name of database file
 
 int db_file() {
-    int fd = open(DBFILE, O_CREAT | O_EXCL | O_RDWR);
+    int fd = open(DBFILE, O_CREAT | O_RDWR, 0644);
     return fd;
 }
 
-void shut_down_db() { remove(DBFILE); }
+void shut_down_db() { close(db_file()); }
 
 void *new_page(page_id_t id) {
     void *page = malloc(PAGE_SIZE);
@@ -119,9 +119,10 @@ void defragment(void *page) {
     free(temp);
 }
 
-void write_page(void *page, uint32_t fd) {
+void write_page(void *page) {
     Header *page_header = PAGE_HEADER(page);
 
+    int fd = db_file();
     int s = lseek(fd, page_header->id * PAGE_SIZE, SEEK_SET);
     int w = write(fd, page, PAGE_SIZE);
     int f = fsync(fd);
@@ -131,7 +132,7 @@ void write_page(void *page, uint32_t fd) {
     }
 }
 
-void *read_page(page_id_t page_id, uint32_t fd) {
+void *read_page(page_id_t page_id) {
     void *page = malloc(PAGE_SIZE);
 
     int offset = page_id * PAGE_SIZE;
@@ -140,6 +141,7 @@ void *read_page(page_id_t page_id, uint32_t fd) {
         exit(1);
     }
 
+    int fd = db_file();
     int s = lseek(fd, offset, SEEK_SET);
     int r = read(fd, page, PAGE_SIZE);
 

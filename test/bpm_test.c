@@ -1,7 +1,9 @@
 #include "../include/bpm.h"
 #include <check.h>
 #include <fcntl.h>
+#include <search.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 START_TEST(buffer_pool_manager) {
@@ -9,7 +11,7 @@ START_TEST(buffer_pool_manager) {
     /*
      * INITIALIZE
      */
-    size_t pool_size = 10;
+    const size_t pool_size = 10;
     BufferPoolManager *bpm = new_bpm(pool_size);
     ck_assert_int_eq(bpm->pool_size, pool_size);
     for (size_t i = 0; i < bpm->pool_size; i++) {
@@ -17,10 +19,30 @@ START_TEST(buffer_pool_manager) {
     }
 
     /*
+     * PIN PAGE
+     */
+    const page_id_t pid = 1;
+    void *page = new_page(pid);
+    write_page(page);
+
+    BpmPage *bpm_page = new_bpm_page(bpm, pid);
+
+    ck_assert_int_eq(bpm_page->id, 1);
+    ck_assert_int_eq(bpm_page->is_dirty, false);
+    ck_assert_int_eq(bpm_page->pin_count, 1);
+
+    Header *p_h = PAGE_HEADER(page);
+    Header *bpm_h = PAGE_HEADER(bpm_page->data);
+    ck_assert_int_eq(p_h->id, bpm_h->id);
+    ck_assert_int_eq(p_h->free_total, bpm_h->free_total);
+
+    /*
      * UNPIN PAGE
      */
-    bool unpinned = unpin_page(-1, false, bpm);
-    ck_assert_int_eq(unpinned, false);
+    bool ok1 = unpin_page(0, false, bpm);
+    ck_assert_int_eq(ok1, false);
+    bool ok2 = unpin_page(pid, false, bpm);
+    ck_assert_int_eq(ok2, true);
 }
 END_TEST
 
@@ -28,7 +50,7 @@ Suite *page_suite(void) {
     Suite *s;
     TCase *tc_core;
 
-    s = suite_create("Page");
+    s = suite_create("BufferPoolManager");
 
     tc_core = tcase_create("Core");
 

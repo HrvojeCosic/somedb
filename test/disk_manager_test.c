@@ -5,12 +5,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct TupleExample {
+typedef struct {
     int x;
     char y[30];
 } TupleExample;
 
-START_TEST(page) {
+START_TEST(disk_manager) {
     pthread_t t1, t2;
 
     /*
@@ -65,10 +65,8 @@ START_TEST(page) {
     /*
      * DISK PERSISTENCE
      */
-    int fd = db_file();
-    write_page(page, fd);
-    void *rp = read_page(id, fd);
-    shut_down_db(); // remove now in case assert fails
+    write_page(page);
+    void *rp = read_page(id);
     TupleExample *rc = get_tuple(rp, 0);
     ck_assert_str_eq(rc->y, "str2");
     ck_assert_int_eq(rc->x, 2);
@@ -81,11 +79,11 @@ Suite *page_suite(void) {
     Suite *s;
     TCase *tc_core;
 
-    s = suite_create("Page");
+    s = suite_create("DiskManager");
 
     tc_core = tcase_create("Core");
 
-    tcase_add_test(tc_core, page);
+    tcase_add_test(tc_core, disk_manager);
     suite_add_tcase(s, tc_core);
 
     return s;

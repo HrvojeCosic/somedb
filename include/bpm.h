@@ -1,26 +1,24 @@
 #pragma once
 
-#define _GNU_SOURCE
 #include "disk_manager.h"
+#include "hash.h"
 #include "shared.h"
-#include <search.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct BufferPoolManagerPage {
+typedef struct {
     page_id_t id;
     void *data[PAGE_SIZE];
     int pin_count;
     bool is_dirty;
 } BpmPage;
 
-typedef struct BufferPoolManager {
-    size_t pool_size; // number of frames in the buffer pool
-    BpmPage *pages;   // array of pages in the buffer pool
-    struct hsearch_data
-        *page_table; // map pages in the buffer pool to its frames
-    bool *free_list; // list of available frames
+typedef struct {
+    size_t pool_size;      // number of frames in the buffer pool
+    BpmPage *pages;        // array of pages in the buffer pool
+    HashTable *page_table; // map pages in the buffer pool to its frames
+    bool *free_list;       // index of the last available frame
 } BufferPoolManager;
 
 /*
@@ -29,9 +27,9 @@ typedef struct BufferPoolManager {
 BufferPoolManager *new_bpm(size_t pool_size);
 
 /**
- * Unpin page of provided id from the buffer pool and returns true. If the
- * page does not exist, return false. Sets page's dirty bit to value provided in
- * is_dirty
+ * Unpins page of provided id from the buffer pool and returns true. If the
+ * page does not exist, returns false. Sets page's dirty bit to value provided
+ * in is_dirty
  */
 bool unpin_page(page_id_t id, bool is_dirty, BufferPoolManager *bpm);
 

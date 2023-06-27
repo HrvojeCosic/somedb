@@ -20,7 +20,6 @@ DEPFILES=$(patsubst %.c,%.d,$(CFILES))
 TESTS=$(wildcard $(TEST)/*.c)
 TESTBINS=$(patsubst $(TEST)/%.c, $(TEST)/bin/%, $(TESTS))
 
-
 all: $(BINARY)
 
 $(BINARY): $(OFILES)
