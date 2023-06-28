@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 START_TEST(hash) {
     /*
@@ -19,20 +20,28 @@ START_TEST(hash) {
     /*
      * INSERT/FIND
      */
-    page_id_t val = 1;
-    const char *key1 = "1";
-    const char *key2 = "2";
-    const char *key3 = "11"; // collision
-    hash_insert(key1, &val, ht);
-    hash_insert(key2, &val, ht);
-    hash_insert(key3, &val, ht);
+    page_id_t *val1 = malloc(sizeof(page_id_t));
+    page_id_t *val2 = malloc(sizeof(page_id_t));
+    page_id_t *val3 = malloc(sizeof(page_id_t));
+    char *key1 = malloc(sizeof(char) * 2);
+    char *key2 = malloc(sizeof(char) * 2);
+    char *key3 = malloc(sizeof(char) * 3);
+    *val1 = 1;
+    *val2 = 2;
+    *val3 = 3;
+    strncpy(key1, "1", 2);
+    strncpy(key2, "2", 2);
+    strncpy(key3, "11", 3); // collision
+    hash_insert(key1, val1, ht);
+    hash_insert(key2, val2, ht);
+    hash_insert(key3, val3, ht);
     HashEl *found1 = hash_find(key1, ht);
     HashEl *found2 = hash_find(key2, ht);
     HashEl *found3 = hash_find(key3, ht);
     ck_assert_str_eq(found1->key, key1);
     ck_assert_str_eq(found2->key, key2);
     ck_assert_str_eq(found3->key, key3);
-    ck_assert_int_eq(*(page_id_t *)found1->data, val);
+    ck_assert_int_eq(*(page_id_t *)found1->data, *val1);
 
     // Test collision handling
     ck_assert_str_eq(found1->next->key, key3);
@@ -44,8 +53,13 @@ START_TEST(hash) {
     hash_remove(key2, ht); // Remove sole element in a bucket
     ck_assert_ptr_null(hash_find(key2, ht));
 
-    hash_insert(key3, &val, ht);
+    hash_insert(key3, val3, ht);
     hash_remove(key3, ht); // Remove first element in a multiple-element bucket
+
+    page_id_t *val3_second = malloc(sizeof(page_id_t));
+    *val3_second = 32;
+    hash_insert(key3, val3_second, ht);
+    hash_remove(key1, ht);
 
     destroy_hash(&ht);
 }

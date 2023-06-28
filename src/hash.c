@@ -1,5 +1,7 @@
 #include "../include/hash.h"
+#include "../include/shared.h"
 #include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +14,15 @@ HashTable *init_hash(uint8_t size) {
     return ht;
 }
 
+static void free_hash_el(HashEl **el) {
+    free((void *)(*el)->key);
+    free((*el)->data);
+    (*el)->key = NULL;
+    (*el)->data = NULL;
+    free(*el);
+    *el = NULL;
+}
+
 void destroy_hash(HashTable **ht) {
     if (ht == NULL || *ht == NULL)
         return;
@@ -20,10 +31,11 @@ void destroy_hash(HashTable **ht) {
         HashEl *curr = (*ht)->arr + i;
         HashEl *temp = NULL;
 
-        while (curr != NULL && curr->key != NULL) {
-            temp = curr;
-            curr = curr->next;
-            free(temp);
+        while (curr && curr->key &&
+               curr->next) { // don't attempt to free an "ht->arr" element
+            temp = curr->next;
+            curr = curr->next->next;
+            free_hash_el(&temp);
         }
     }
     free((*ht)->arr);
@@ -33,7 +45,7 @@ void destroy_hash(HashTable **ht) {
 }
 
 /**
- * hashing function
+ * Hashing function
  * To be thought about
  */
 static uint8_t hash(const char *key, HashTable *ht) {
@@ -43,6 +55,7 @@ static uint8_t hash(const char *key, HashTable *ht) {
 void hash_insert(const char *key, void *data, HashTable *ht) {
     if (key == NULL || data == NULL)
         return;
+
     uint8_t idx = hash(key, ht);
 
     HashEl *el = malloc(sizeof(HashEl));
@@ -76,16 +89,15 @@ void hash_remove(const char *key, HashTable *ht) {
     if (prev == NULL) {           // if its first el. in LL
         if (temp->next == NULL) { // if its the only el. in LL
             ht->arr[idx] = (HashEl){0};
-            free(temp);
         } else {
             HashEl *next = temp->next;
-            free(temp);
             ht->arr[idx] = *next;
-            free(next);
         }
+        free((void *)ht->arr[idx].key);
+        free(ht->arr[idx].data);
     } else {
         prev->next = temp->next;
-        free(temp);
+        free_hash_el(&temp);
     }
 }
 
