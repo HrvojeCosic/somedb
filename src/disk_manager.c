@@ -135,13 +135,15 @@ void write_page(void *page) {
 void *read_page(page_id_t page_id) {
     void *page = malloc(PAGE_SIZE);
 
+    int fd = db_file();
+
     int offset = page_id * PAGE_SIZE;
-    if (offset > PAGE_SIZE) {
+    off_t fsize = lseek(fd, 0, SEEK_END);
+    if (offset >= fsize) {
         printf("I/O error, reading past EOF\n");
         exit(1);
     }
 
-    int fd = db_file();
     int s = lseek(fd, offset, SEEK_SET);
     int r = read(fd, page, PAGE_SIZE);
 

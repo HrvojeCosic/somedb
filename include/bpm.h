@@ -18,7 +18,7 @@ typedef struct {
     size_t pool_size;      // number of frames in the buffer pool
     BpmPage *pages;        // array of pages in the buffer pool
     HashTable *page_table; // map pages in the buffer pool to its frames
-    bool *free_list;       // index of the last available frame
+    bool *free_list;       // array of frame statuses (true=free/false=taken)
 } BufferPoolManager;
 
 /*

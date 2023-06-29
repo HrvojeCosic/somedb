@@ -35,38 +35,36 @@ static void add_to_pagetable(frame_id_t key, frame_id_t *val,
 }
 
 BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
-    /*
-     * TODO: REPLACEMENT POLICY INTEGRATION
-     */
+    // Return early if already exists
+    char pid_str[11];
+    sprintf(pid_str, "%d", pid);
+    HashEl *found = hash_find(pid_str, bpm->page_table);
+    if (found) {
+        frame_id_t fidx = (*(frame_id_t *)found->data);
+        return bpm->pages + fidx;
+    }
 
-    // TODO: RETURN EARLY IF EXISTS ALREADY
-    //    char pid_str[15];
-    //    sprintf(pid_str, "%d", pid);
-    //    HashEl *found = hash_find(pid_str, bpm->page_table);
-    //    if (strcmp(pid_str, found->key) == 0) {
-    //	BpmPage page = {0};
-    //	return page;
-    //    }
-
+    // Find free frame id
     frame_id_t *fid = malloc(sizeof(frame_id_t));
     for (size_t i = 0; i < bpm->pool_size; i++) {
-        if (bpm->pages[i].id == 0) {
-            *fid = bpm->pages[i].id + 1;
+        if (bpm->free_list[i] == true) {
+            *fid = i;
+            bpm->free_list[i] = false;
             break;
         }
     }
-    if (fid == 0)
-        return NULL;
 
-    BpmPage *page = malloc(sizeof(BpmPage));
-    page->id = *fid;
-    page->is_dirty = false;
-    page->pin_count = 1;
-    memcpy(page->data, read_page(pid), PAGE_SIZE);
+    /*
+     * TODO: REPLACEMENT POLICY INTEGRATION (return NULL if not replaceable)
+     */
+
+    BpmPage page = {.id = *fid, .is_dirty = false, .pin_count = 1};
+    memcpy(page.data, read_page(pid), PAGE_SIZE);
+    bpm->pages[*fid] = page;
 
     add_to_pagetable(pid, fid, bpm);
 
-    return page;
+    return bpm->pages + *fid;
 }
 
 bool unpin_page(page_id_t page_id, bool is_dirty, BufferPoolManager *bpm) {

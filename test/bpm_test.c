@@ -21,27 +21,31 @@ START_TEST(buffer_pool_manager) {
     /*
      * PIN PAGE
      */
-    const page_id_t pid = 1;
-    void *page = new_page(pid);
-    write_page(page);
+    const page_id_t pid1 = 1, pid2 = 2;
+    void *page1 = new_page(pid1);
+    void *page2 = new_page(pid2);
+    write_page(page1);
+    write_page(page2);
 
-    BpmPage *bpm_page = new_bpm_page(bpm, pid);
+    BpmPage *bpm_page2 = new_bpm_page(bpm, pid2);
+    BpmPage *bpm_page1 = new_bpm_page(bpm, pid1);
+    ck_assert_int_eq(bpm_page1->is_dirty, false);
+    ck_assert_int_eq(bpm_page1->pin_count, 1);
 
-    ck_assert_int_eq(bpm_page->id, 1);
-    ck_assert_int_eq(bpm_page->is_dirty, false);
-    ck_assert_int_eq(bpm_page->pin_count, 1);
+    Header *page1_h = PAGE_HEADER(bpm_page1->data);
+    Header *page2_h = PAGE_HEADER(bpm_page2->data);
+    ck_assert_int_eq(page1_h->id, pid1);
+    ck_assert_int_eq(page2_h->id, pid2);
 
-    Header *p_h = PAGE_HEADER(page);
-    Header *bpm_h = PAGE_HEADER(bpm_page->data);
-    ck_assert_int_eq(p_h->id, bpm_h->id);
-    ck_assert_int_eq(p_h->free_total, bpm_h->free_total);
+    BpmPage *dup_page1 = new_bpm_page(bpm, pid1);
+    ck_assert_ptr_eq(dup_page1, bpm_page1);
 
     /*
      * UNPIN PAGE
      */
     bool ok1 = unpin_page(0, false, bpm);
     ck_assert_int_eq(ok1, false);
-    bool ok2 = unpin_page(pid, false, bpm);
+    bool ok2 = unpin_page(pid1, false, bpm);
     ck_assert_int_eq(ok2, true);
 }
 END_TEST
