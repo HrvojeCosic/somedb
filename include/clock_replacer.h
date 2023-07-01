@@ -1,14 +1,13 @@
 #pragma once
 
+#include "./circular_list.h"
 #include "shared.h"
-#include <cstddef>
-#include <cstdint>
 
 typedef struct {
     size_t num_pages;  // max number of pages ClockReplacer is required to store
     void *frames;      // frames tracked by ClockReplacer
     void *frame_table; // to map each frame to its reference bit
-    void *hand;        // current position of the clock h
+    CircularListNode *hand; // current position of the clock hand
 } ClockReplacer;
 
 /**

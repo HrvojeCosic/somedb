@@ -1,5 +1,6 @@
 #pragma once
 
+#include "clock_replacer.h"
 #include "disk_manager.h"
 #include "hash.h"
 #include "shared.h"
@@ -10,15 +11,17 @@
 typedef struct {
     page_id_t id;
     void *data[PAGE_SIZE];
-    int pin_count;
-    bool is_dirty;
+    int pin_count; // number of threads using this bpm page
+    bool is_dirty; // shows if the page has been modified after being read from
+                   // disk
 } BpmPage;
 
 typedef struct {
-    size_t pool_size;      // number of frames in the buffer pool
-    BpmPage *pages;        // array of pages in the buffer pool
-    HashTable *page_table; // map pages in the buffer pool to its frames
-    bool *free_list;       // array of frame statuses (true=free/false=taken)
+    size_t pool_size;       // number of frames in the buffer pool
+    BpmPage *pages;         // array of pages in the buffer pool
+    HashTable *page_table;  // map pages in the buffer pool to its frames
+    bool *free_list;        // array of frame statuses (true=free/false=taken)
+    ClockReplacer replacer; // finding unpinned frames to replace
 } BufferPoolManager;
 
 /*

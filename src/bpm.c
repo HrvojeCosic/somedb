@@ -17,11 +17,14 @@ BufferPoolManager *new_bpm(const size_t pool_size) {
         free_list[i] = true;
     }
 
+    // ClockReplacer replacer = {.hand = };
+
     BufferPoolManager *bpm = malloc(sizeof(BufferPoolManager));
     bpm->pool_size = pool_size;
     bpm->pages = pages;
     bpm->free_list = free_list;
     bpm->page_table = init_hash(pool_size);
+    // bpm->replacer = {};
 
     return bpm;
 }
