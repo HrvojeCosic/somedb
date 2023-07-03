@@ -1,6 +1,7 @@
 #include "../include/circular_list.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 CircularList *circular_list_init(size_t capacity) {
     CircularList *cl = malloc(sizeof(CircularList));
@@ -41,6 +42,10 @@ static void free_cl_node(CircularListNode **node) {
     *node = NULL;
 }
 
+static bool are_equal(void *val1, void *val2) {
+    return (val1 == val2 || strcmp(val1, val2) == 0);
+}
+
 void circular_list_destroy(CircularList **cl) {
     CircularListNode *curr = (*cl)->head;
     while (curr != NULL) {
@@ -54,7 +59,7 @@ bool circular_list_remove(void *node_val, CircularList *cl) {
     if (cl->head == NULL)
         return false;
 
-    if (cl->head->value == node_val) {
+    if (are_equal(cl->head->value, node_val)) {
         CircularListNode *temp = cl->head;
         cl->head = cl->head->next;
         free_cl_node(&temp);
@@ -65,7 +70,7 @@ bool circular_list_remove(void *node_val, CircularList *cl) {
     CircularListNode *curr = cl->head->next;
     CircularListNode *prev = cl->head;
 
-    while (curr != NULL && curr->value != node_val) {
+    while (curr != NULL && are_equal(cl->head->value, node_val)) {
         prev = curr;
         curr = curr->next;
     }

@@ -47,6 +47,17 @@ START_TEST(hash) {
     ck_assert_str_eq(found1->next->key, key3);
     ck_assert_ptr_null(found2->next);
 
+    // Test overwriting duplicate keys
+    char *key2_overwrite = malloc(sizeof(char) * 2);
+    strncpy(key2_overwrite, "2", 2);
+    page_id_t *val2_overwrite = malloc(sizeof(page_id_t));
+    *val2_overwrite = 33;
+    hash_insert(key2_overwrite, val2_overwrite, ht);
+    HashEl *overwritten = hash_find(key2, ht);
+    ck_assert_ptr_null(overwritten->next); // still only key "2" in that bucket
+    ck_assert_str_eq(overwritten->key, key2_overwrite);
+    ck_assert_int_eq(*(page_id_t *)overwritten->data, *val2_overwrite);
+
     /*
      * REMOVE
      */
@@ -58,7 +69,8 @@ START_TEST(hash) {
 
     page_id_t *val3_second = malloc(sizeof(page_id_t));
     *val3_second = 32;
-    hash_insert(key3, val3_second, ht);
+    char *key3_second = malloc(sizeof(char) * 3);
+    hash_insert(key3_second, val3_second, ht);
     hash_remove(key1, ht);
 
     destroy_hash(&ht);

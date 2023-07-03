@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef struct HashEl {
@@ -31,7 +32,7 @@ HashEl *hash_find(const char *key, HashTable *ht);
 /*
  * Removes the element of KEY in the hash table HT
  */
-void hash_remove(const char *key, HashTable *ht);
+bool hash_remove(const char *key, HashTable *ht);
 
 /*
  * Frees all memory allocated for a hash table HT

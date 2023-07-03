@@ -67,13 +67,24 @@ void hash_insert(const char *key, void *data, HashTable *ht) {
         ht->arr[idx] = *el;
     } else {
         HashEl *temp = &ht->arr[idx];
-        while (temp->next != NULL)
+        HashEl *prev = NULL;
+        bool overwrite = false;
+        while (temp != NULL) {
+            if (strcmp(temp->key, key) == 0) {
+                el->next = temp->next;
+                *temp = *el;
+                overwrite = true;
+                break;
+            }
+            prev = temp;
             temp = temp->next;
-        temp->next = el;
+        }
+        if (!overwrite)
+            prev->next = el;
     }
 }
 
-void hash_remove(const char *key, HashTable *ht) {
+bool hash_remove(const char *key, HashTable *ht) {
     uint8_t idx = hash(key, ht);
     HashEl *temp = ht->arr + idx;
     HashEl *prev = NULL;
@@ -84,7 +95,7 @@ void hash_remove(const char *key, HashTable *ht) {
     }
 
     if (temp == NULL)
-        return;
+        return false;
 
     if (prev == NULL) {           // if its first el. in LL
         if (temp->next == NULL) { // if its the only el. in LL
@@ -99,6 +110,7 @@ void hash_remove(const char *key, HashTable *ht) {
         prev->next = temp->next;
         free_hash_el(&temp);
     }
+    return true;
 }
 
 HashEl *hash_find(const char *key, HashTable *ht) {
