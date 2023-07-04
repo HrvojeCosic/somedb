@@ -89,7 +89,7 @@ bool hash_remove(const char *key, HashTable *ht) {
     HashEl *temp = ht->arr + idx;
     HashEl *prev = NULL;
 
-    while (temp != NULL && strcmp(temp->key, key) != 0) {
+    while (temp != NULL && temp->key != NULL && strcmp(temp->key, key) != 0) {
         prev = temp;
         temp = temp->next;
     }

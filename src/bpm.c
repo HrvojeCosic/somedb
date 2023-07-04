@@ -17,19 +17,17 @@ BufferPoolManager *new_bpm(const size_t pool_size) {
         free_list[i] = true;
     }
 
-    // ClockReplacer replacer = {.hand = };
-
     BufferPoolManager *bpm = malloc(sizeof(BufferPoolManager));
     bpm->pool_size = pool_size;
     bpm->pages = pages;
     bpm->free_list = free_list;
     bpm->page_table = init_hash(pool_size);
-    // bpm->replacer = {};
+    bpm->replacer = *clock_replacer_init(pool_size);
 
     return bpm;
 }
 
-static void add_to_pagetable(frame_id_t key, frame_id_t *val,
+static void add_to_pagetable(page_id_t key, frame_id_t *val,
                              BufferPoolManager *bpm) {
     char *key_str = malloc(sizeof(char) * 5);
     sprintf(key_str, "%u", key);
@@ -49,6 +47,7 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
 
     // Find free frame id
     frame_id_t *fid = malloc(sizeof(frame_id_t));
+    *fid = UINT32_MAX;
     for (size_t i = 0; i < bpm->pool_size; i++) {
         if (bpm->free_list[i] == true) {
             *fid = i;
@@ -56,16 +55,17 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
             break;
         }
     }
-
-    /*
-     * TODO: REPLACEMENT POLICY INTEGRATION (return NULL if not replaceable)
-     */
+    if (*fid == UINT32_MAX)
+        *fid = evict(&bpm->replacer);
+    if (*fid == UINT32_MAX)
+        return NULL;
 
     BpmPage page = {.id = *fid, .is_dirty = false, .pin_count = 1};
     memcpy(page.data, read_page(pid), PAGE_SIZE);
     bpm->pages[*fid] = page;
 
     add_to_pagetable(pid, fid, bpm);
+    clock_replacer_pin(fid, &bpm->replacer);
 
     return bpm->pages + *fid;
 }
@@ -81,8 +81,14 @@ bool unpin_page(page_id_t page_id, bool is_dirty, BufferPoolManager *bpm) {
 
     frame_id_t frame_idx = *(frame_id_t *)(el->data);
     BpmPage *page = bpm->pages + frame_idx;
-    page->pin_count = 0;
+
+    if (page->pin_count == 0)
+        return false;
+
     page->is_dirty = is_dirty;
+    page->pin_count--;
+    if (page->pin_count == 0)
+        clock_replacer_unpin(el->data, &bpm->replacer);
 
     return true;
 }

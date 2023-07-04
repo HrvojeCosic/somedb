@@ -24,7 +24,7 @@ static char *frame_to_str(frame_id_t frame_id) {
     return str;
 }
 
-frame_id_t victim(ClockReplacer *replacer) {
+frame_id_t evict(ClockReplacer *replacer) {
     RWLOCK_WRLOCK(&replacer->latch);
     if (replacer->frames->size == 0)
         return UINT32_MAX;
@@ -55,7 +55,7 @@ frame_id_t victim(ClockReplacer *replacer) {
     return UINT32_MAX;
 }
 
-void unpin(frame_id_t *frame_id, ClockReplacer *replacer) {
+void clock_replacer_unpin(frame_id_t *frame_id, ClockReplacer *replacer) {
     RWLOCK_WRLOCK(&replacer->latch);
     char *frame_str = frame_to_str(*frame_id);
 
@@ -71,7 +71,7 @@ void unpin(frame_id_t *frame_id, ClockReplacer *replacer) {
     RWLOCK_UNLOCK(&replacer->latch);
 }
 
-void pin(frame_id_t *frame_id, ClockReplacer *replacer) {
+void clock_replacer_pin(frame_id_t *frame_id, ClockReplacer *replacer) {
     RWLOCK_WRLOCK(&replacer->latch);
 
     char *frame_str = frame_to_str(*frame_id);

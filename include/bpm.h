@@ -31,8 +31,8 @@ BufferPoolManager *new_bpm(size_t pool_size);
 
 /**
  * Unpins page of provided id from the buffer pool and returns true. If the
- * page does not exist, returns false. Sets page's dirty bit to value provided
- * in is_dirty
+ * page does not exist or it's pin count is already 0, returns false. Sets
+ * page's dirty bit to value provided in is_dirty
  */
 bool unpin_page(page_id_t id, bool is_dirty, BufferPoolManager *bpm);
 

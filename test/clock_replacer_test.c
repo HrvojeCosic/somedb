@@ -28,7 +28,7 @@ START_TEST(clock_replacer) {
         // UNPIN
         frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
         *fid_ptr = fid;
-        unpin(fid_ptr, replacer);
+        clock_replacer_unpin(fid_ptr, replacer);
 
         char *fid_str = malloc(sizeof(char) * 11);
         snprintf(fid_str, 11, "%d", fid);
@@ -38,7 +38,7 @@ START_TEST(clock_replacer) {
         ck_assert_int_eq(*(bool *)found->data, 1);
 
         // PIN
-        pin(fid_ptr, replacer);
+        clock_replacer_pin(fid_ptr, replacer);
         HashEl *found_fid = hash_find(frame_to_str(fid), replacer->frame_table);
         ck_assert_ptr_null(found_fid);
     }
@@ -49,20 +49,20 @@ START_TEST(clock_replacer) {
     for (frame_id_t fid = 0; fid < 3; fid++) {
         frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
         *fid_ptr = fid;
-        unpin(fid_ptr, replacer);
+        clock_replacer_unpin(fid_ptr, replacer);
     }
-    frame_id_t vic_full_fid = victim(replacer);
+    frame_id_t vic_full_fid = evict(replacer);
     ck_assert_uint_eq(vic_full_fid, UINT32_MAX);
 
     // Unpin frames 0 and 1. Leave frame 2 pinned
     for (frame_id_t fid = 0; fid < 2; fid++) {
         frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
         *fid_ptr = fid;
-        unpin(fid_ptr, replacer);
+        clock_replacer_unpin(fid_ptr, replacer);
     }
     frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
     *fid_ptr = 2;
-    frame_id_t vic_nonfull_fid = victim(replacer);
+    frame_id_t vic_nonfull_fid = evict(replacer);
     ck_assert_uint_eq(vic_nonfull_fid, *fid_ptr);
 }
 END_TEST

@@ -23,19 +23,18 @@ ClockReplacer *clock_replacer_init(size_t capacity);
  * to true, sets it to false without returning. Returns UINT32_MAX if there is
  * no evictable frame
  */
-frame_id_t victim(ClockReplacer *replacer);
+frame_id_t evict(ClockReplacer *replacer);
 
 /**
- * Removes provided frame containing the pinned page from the ClockReplacer
- * Should be called when the page is pinned to a frame in the BufferPoolManager.
+ * Pins a frame of specified id, meaning it should not be evictable until
+ * unpinned
  */
-void pin(frame_id_t *frame_id, ClockReplacer *replacer);
+void clock_replacer_pin(frame_id_t *frame_id, ClockReplacer *replacer);
 
 /**
- * Adds provided frame containing the unpinned page to the ClockReplacer
- * Should be called when page's pin count becomes 0
+ * Unpins a frame of specified id, which makes it evictable
  */
-void unpin(frame_id_t *frame_id, ClockReplacer *replacer);
+void clock_replacer_unpin(frame_id_t *frame_id, ClockReplacer *replacer);
 
 /**
  * Returns the number of frames currently in the ClockReplacer

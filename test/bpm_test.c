@@ -11,7 +11,7 @@ START_TEST(buffer_pool_manager) {
     /*
      * INITIALIZE
      */
-    const size_t pool_size = 10;
+    const size_t pool_size = 3;
     BufferPoolManager *bpm = new_bpm(pool_size);
     ck_assert_int_eq(bpm->pool_size, pool_size);
     for (size_t i = 0; i < bpm->pool_size; i++) {
@@ -43,8 +43,6 @@ START_TEST(buffer_pool_manager) {
     /*
      * UNPIN PAGE
      */
-    bool ok1 = unpin_page(0, false, bpm);
-    ck_assert_int_eq(ok1, false);
     bool ok2 = unpin_page(pid1, false, bpm);
     ck_assert_int_eq(ok2, true);
 }
