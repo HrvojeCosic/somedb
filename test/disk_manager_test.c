@@ -10,19 +10,20 @@ typedef struct {
     char y[30];
 } TupleExample;
 
-START_TEST(disk_manager) {
-    pthread_t t1, t2;
+static void *page;
+static uint32_t pid;
+static Header *header;
+static pthread_t t1, t2;
+static TupleExample *tup_get;
 
-    /*
-     * ADD PAGE
-     */
-    const uint32_t id = 0;
-    void *page = new_page(id);
-    Header *header = PAGE_HEADER(page);
+START_TEST(add_page) {
+    pid = 0;
+    page = new_page(pid);
+    header = PAGE_HEADER(page);
+}
+END_TEST
 
-    /*
-     * ADD TUPLE
-     */
+START_TEST(add_tuple_to_page) {
     TupleExample t_ex1 = {.y = "str1", .x = 1};
     TupleExample t_ex2 = {.y = "str2", .x = 2};
     AddTupleArgs t_args1 = {
@@ -33,45 +34,42 @@ START_TEST(disk_manager) {
     pthread_create(&t2, NULL, (void *)add_tuple, &t_args2);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
+}
+END_TEST
 
-    /*
-     * GET TUPLE
-     */
-    TupleExample *t2_get = get_tuple(page, 1);
-    ck_assert_str_eq(t2_get->y, "str2");
-    ck_assert_int_eq(t2_get->x, 2);
+START_TEST(get_tuple_from_page) {
+    tup_get = get_tuple(page, 1);
+    ck_assert_str_eq(tup_get->y, "str2");
+    ck_assert_int_eq(tup_get->x, 2);
+}
+END_TEST
 
-    /*
-     * REMOVE TUPLE
-     */
+START_TEST(remove_tuple_from_page) {
     uint32_t tid = 0;
     remove_tuple(page, tid);
     ck_assert_ptr_null(get_tuple(page, tid));
     ck_assert_int_eq(header->flags, COMPACTABLE);
     ck_assert_int_eq(get_tuple_ptr_list(page).length, 2);
+}
+END_TEST
 
-    /*
-     * DEFRAGMENT
-     * After defragmenting, the removed tuple memory should be freed
-     */
+START_TEST(defragment_page) {
     uint16_t total_before = header->free_total;
     defragment(page);
-    ck_assert_int_eq(t2_get->x, 0);
-    ck_assert_int_eq(*t2_get->y, 0);
+    ck_assert_int_eq(tup_get->x, 0);
+    ck_assert_int_eq(*tup_get->y, 0);
     ck_assert_int_eq(header->free_total,
                      total_before + sizeof(TupleExample) + sizeof(TuplePtr));
     ck_assert_int_eq(get_tuple_ptr_list(page).length, 1);
+}
+END_TEST
 
-    /*
-     * DISK PERSISTENCE
-     */
+START_TEST(disk_persistance) {
     write_page(page);
-    void *rp = read_page(id);
+    void *rp = read_page(pid);
     TupleExample *rc = get_tuple(rp, 0);
     ck_assert_str_eq(rc->y, "str2");
     ck_assert_int_eq(rc->x, 2);
-
-    free(page);
 }
 END_TEST
 
@@ -83,7 +81,12 @@ Suite *page_suite(void) {
 
     tc_core = tcase_create("Core");
 
-    tcase_add_test(tc_core, disk_manager);
+    tcase_add_test(tc_core, add_page);
+    tcase_add_test(tc_core, add_tuple_to_page);
+    tcase_add_test(tc_core, get_tuple_from_page);
+    tcase_add_test(tc_core, remove_tuple_from_page);
+    tcase_add_test(tc_core, defragment_page);
+    tcase_add_test(tc_core, disk_persistance);
     suite_add_tcase(s, tc_core);
 
     return s;
@@ -101,5 +104,9 @@ int main(void) {
     srunner_run_all(sr, CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
     srunner_free(sr);
+
+    free(header);
+    free(page);
+
     return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

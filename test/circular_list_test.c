@@ -3,53 +3,55 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-START_TEST(circular_list) {
-    /*
-     * INITIALIZE
-     */
-    CircularList *cl = circular_list_init(10);
+CircularList *cl;
+static int *val1, *val2, *val3;
+static CircularListNode *node1, *node2, *node3;
+
+START_TEST(initialize) {
+    cl = circular_list_init(10);
     ck_assert_int_eq(cl->capacity, 10);
     ck_assert_ptr_null(cl->head);
 
-    /*
-     * INSERT
-     */
-    int *val1 = malloc(sizeof(int));
+    val1 = malloc(sizeof(int));
+    val2 = malloc(sizeof(int));
+    val3 = malloc(sizeof(int));
     *val1 = 1;
-    int *val2 = malloc(sizeof(int));
     *val2 = 2;
-    int *val3 = malloc(sizeof(int));
     *val3 = 3;
-    CircularListNode *node1 = circular_list_insert(val1, cl);
-    circular_list_insert(val2, cl);
-    CircularListNode *node3 = circular_list_insert(val3, cl);
+}
+END_TEST
+
+START_TEST(insert_el) {
+    node1 = circular_list_insert(val1, cl);
+    node2 = circular_list_insert(val2, cl);
+    node3 = circular_list_insert(val3, cl);
     ck_assert_int_eq(*(int *)(cl->head->value), *val3);
     ck_assert_int_eq(*(int *)(cl->head->next->value), *val2);
     ck_assert_int_eq(*(int *)(cl->head->next->next->value), *val1);
     ck_assert_int_eq(cl->size, 3);
+}
 
-    /*
-     * GET NEXT
-     */
+START_TEST(get_next_el) {
     CircularListNode *next_to_3 = circular_list_next(node3, cl);
     ck_assert_ptr_eq(next_to_3, cl->head->next);
 
     CircularListNode *next_to_1 = circular_list_next(node1, cl);
     ck_assert_ptr_eq(next_to_1, cl->head);
+}
+END_TEST
 
-    /*
-     * REMOVE
-     */
+START_TEST(remove_el) {
     circular_list_remove(val2, cl);
     ck_assert_ptr_eq(node3->next, node1);
     ck_assert_int_eq(cl->size, 2);
+}
+END_TEST
 
-    /*
-     * DESTROY
-     */
+START_TEST(destroy) {
     circular_list_destroy(&cl);
     ck_assert_int_eq(cl->size, 0);
 }
+END_TEST
 
 Suite *page_suite(void) {
     Suite *s;
@@ -59,7 +61,11 @@ Suite *page_suite(void) {
 
     tc_core = tcase_create("Core");
 
-    tcase_add_test(tc_core, circular_list);
+    tcase_add_test(tc_core, initialize);
+    tcase_add_test(tc_core, insert_el);
+    tcase_add_test(tc_core, get_next_el);
+    tcase_add_test(tc_core, remove_el);
+    tcase_add_test(tc_core, destroy);
     suite_add_tcase(s, tc_core);
 
     return s;

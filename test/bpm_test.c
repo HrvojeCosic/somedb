@@ -6,22 +6,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-START_TEST(buffer_pool_manager) {
+static BufferPoolManager *bpm;
+static const page_id_t pid1 = 1, pid2 = 2;
 
-    /*
-     * INITIALIZE
-     */
+START_TEST(initialize) {
     const size_t pool_size = 3;
-    BufferPoolManager *bpm = new_bpm(pool_size);
+    bpm = new_bpm(pool_size);
     ck_assert_int_eq(bpm->pool_size, pool_size);
     for (size_t i = 0; i < bpm->pool_size; i++) {
         ck_assert_int_eq(bpm->free_list[i], true);
     }
+}
+END_TEST
 
-    /*
-     * PIN PAGE
-     */
-    const page_id_t pid1 = 1, pid2 = 2;
+START_TEST(pin) {
     void *page1 = new_page(pid1);
     void *page2 = new_page(pid2);
     write_page(page1);
@@ -39,10 +37,10 @@ START_TEST(buffer_pool_manager) {
 
     BpmPage *dup_page1 = new_bpm_page(bpm, pid1);
     ck_assert_ptr_eq(dup_page1, bpm_page1);
+}
+END_TEST
 
-    /*
-     * UNPIN PAGE
-     */
+START_TEST(unpin) {
     bool ok2 = unpin_page(pid1, false, bpm);
     ck_assert_int_eq(ok2, true);
 }
@@ -56,7 +54,9 @@ Suite *page_suite(void) {
 
     tc_core = tcase_create("Core");
 
-    tcase_add_test(tc_core, buffer_pool_manager);
+    tcase_add_test(tc_core, initialize);
+    tcase_add_test(tc_core, pin);
+    tcase_add_test(tc_core, unpin);
     suite_add_tcase(s, tc_core);
 
     return s;
