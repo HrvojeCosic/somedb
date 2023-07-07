@@ -4,7 +4,7 @@ CODEDIRS=. src
 INCDIRS=. ./include
 TEST=test
 
-CC=gcc
+CC=g++
 OPT=-O0
 #Generate files including make rules for .h deps
 DEPFLAGS=-MP -MD 

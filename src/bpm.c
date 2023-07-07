@@ -10,14 +10,15 @@
 #include <string.h>
 
 BufferPoolManager *new_bpm(const size_t pool_size) {
-    BpmPage *pages = calloc(sizeof(BpmPage), pool_size);
-    bool *free_list = malloc(sizeof(bool) * pool_size);
+    BpmPage *pages = (BpmPage *)calloc(sizeof(BpmPage), pool_size);
+    bool *free_list = (bool *)malloc(sizeof(bool) * pool_size);
 
     for (size_t i = 0; i < pool_size; i++) {
         free_list[i] = true;
     }
 
-    BufferPoolManager *bpm = malloc(sizeof(BufferPoolManager));
+    BufferPoolManager *bpm =
+        (BufferPoolManager *)malloc(sizeof(BufferPoolManager));
     bpm->pool_size = pool_size;
     bpm->pages = pages;
     bpm->free_list = free_list;
@@ -29,7 +30,7 @@ BufferPoolManager *new_bpm(const size_t pool_size) {
 
 static void add_to_pagetable(page_id_t key, frame_id_t *val,
                              BufferPoolManager *bpm) {
-    char *key_str = malloc(sizeof(char) * 5);
+    char *key_str = (char *)malloc(sizeof(char) * 5);
     sprintf(key_str, "%u", key);
 
     hash_insert(key_str, val, bpm->page_table);
@@ -46,7 +47,7 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
     }
 
     // Find free frame id
-    frame_id_t *fid = malloc(sizeof(frame_id_t));
+    frame_id_t *fid = (frame_id_t *)malloc(sizeof(frame_id_t));
     *fid = UINT32_MAX;
     for (size_t i = 0; i < bpm->pool_size; i++) {
         if (bpm->free_list[i] == true) {
@@ -60,7 +61,8 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
     if (*fid == UINT32_MAX)
         return NULL;
 
-    BpmPage page = {.id = *fid, .is_dirty = false, .pin_count = 1};
+    BpmPage page = {
+        .id = *fid, .data = NULL, .pin_count = 1, .is_dirty = false};
     memcpy(page.data, read_page(pid), PAGE_SIZE);
     bpm->pages[*fid] = page;
 
@@ -88,7 +90,7 @@ bool unpin_page(page_id_t page_id, bool is_dirty, BufferPoolManager *bpm) {
     page->is_dirty = is_dirty;
     page->pin_count--;
     if (page->pin_count == 0)
-        clock_replacer_unpin(el->data, &bpm->replacer);
+        clock_replacer_unpin((frame_id_t *)el->data, &bpm->replacer);
 
     return true;
 }

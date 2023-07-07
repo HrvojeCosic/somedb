@@ -12,9 +12,9 @@ START_TEST(initialize) {
     ck_assert_int_eq(cl->capacity, 10);
     ck_assert_ptr_null(cl->head);
 
-    val1 = malloc(sizeof(int));
-    val2 = malloc(sizeof(int));
-    val3 = malloc(sizeof(int));
+    val1 = (int *)malloc(sizeof(int));
+    val2 = (int *)malloc(sizeof(int));
+    val3 = (int *)malloc(sizeof(int));
     *val1 = 1;
     *val2 = 2;
     *val3 = 3;

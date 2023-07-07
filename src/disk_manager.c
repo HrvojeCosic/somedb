@@ -32,7 +32,7 @@ void *new_page(page_id_t id) {
 }
 
 TuplePtr *add_tuple(void *data) {
-    AddTupleArgs *data_args = data;
+    AddTupleArgs *data_args = (AddTupleArgs *)data;
     void *page = data_args->page;
     uint16_t tuple_size = data_args->tuple_size;
     void *tuple = data_args->tuple;
@@ -44,11 +44,11 @@ TuplePtr *add_tuple(void *data) {
         return NULL;
     }
 
-    TuplePtr *tuple_ptr = page + header->free_start;
+    TuplePtr *tuple_ptr = (TuplePtr *)((uintptr_t *)page + header->free_start);
     tuple_ptr->start_offset = header->free_end - tuple_size;
     tuple_ptr->size = tuple_size;
 
-    void *tuple_start = page + tuple_ptr->start_offset;
+    void *tuple_start = (uintptr_t *)page + tuple_ptr->start_offset;
     memcpy(tuple_start, tuple, tuple_size);
 
     header->free_start += sizeof(TuplePtr);
@@ -60,7 +60,9 @@ TuplePtr *add_tuple(void *data) {
 }
 
 void remove_tuple(void *page, uint16_t tuple_idx) {
-    TuplePtr *tuple_ptr = page + TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx);
+    TuplePtr *tuple_ptr =
+        (TuplePtr *)((uintptr_t *)page +
+                     TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx));
     Header *page_header = PAGE_HEADER(page);
     page_header->flags |= COMPACTABLE;
 
@@ -68,19 +70,21 @@ void remove_tuple(void *page, uint16_t tuple_idx) {
 }
 
 void *get_tuple(void *page, uint16_t tuple_idx) {
-    TuplePtr *tuple_ptr = page + TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx);
+    TuplePtr *tuple_ptr =
+        (TuplePtr *)((uintptr_t *)page +
+                     TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx));
 
     if (tuple_ptr->start_offset == 0) {
         return NULL;
     }
 
-    return page + tuple_ptr->start_offset;
+    return (uintptr_t *)page + tuple_ptr->start_offset;
 }
 
 TuplePtrList get_tuple_ptr_list(void *page) {
     Header *header = PAGE_HEADER(page);
     TuplePtrList list;
-    list.start = page + sizeof(Header);
+    list.start = (TuplePtr *)((uintptr_t *)page + sizeof(Header));
     list.length = (header->free_start - sizeof(Header)) / sizeof(TuplePtr);
     return list;
 }
@@ -104,9 +108,11 @@ void defragment(void *page) {
         // Removed tuples' offsets are 0
         if (curr_tuple_ptr->start_offset != 0) {
             AddTupleArgs t_args = {.page = temp,
-                                   .tuple = page + curr_tuple_ptr->start_offset,
+                                   .tuple = (uintptr_t *)page +
+                                            curr_tuple_ptr->start_offset,
                                    .tuple_size = curr_tuple_ptr->size};
             add_tuple(&t_args);
+        } else {
         }
     }
     page_header->free_start = temp_header->free_start;
@@ -114,7 +120,7 @@ void defragment(void *page) {
     page_header->free_total = temp_header->free_total;
     page_header->flags &= ~COMPACTABLE;
 
-    memcpy(PAGE_NO_HEADER(page), PAGE_NO_HEADER(temp),
+    memcpy((uintptr_t *)PAGE_NO_HEADER(page), (uintptr_t *)PAGE_NO_HEADER(temp),
            PAGE_SIZE - sizeof(Header));
     free(temp);
 }

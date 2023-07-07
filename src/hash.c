@@ -8,9 +8,9 @@
 #include <string.h>
 
 HashTable *init_hash(uint8_t size) {
-    HashTable *ht = malloc(sizeof(HashTable));
+    HashTable *ht = (HashTable *)malloc(sizeof(HashTable));
     ht->size = size;
-    ht->arr = calloc(sizeof(HashEl), size);
+    ht->arr = (HashEl *)calloc(sizeof(HashEl), size);
     return ht;
 }
 
@@ -58,7 +58,7 @@ void hash_insert(const char *key, void *data, HashTable *ht) {
 
     uint8_t idx = hash(key, ht);
 
-    HashEl *el = malloc(sizeof(HashEl));
+    HashEl *el = (HashEl *)malloc(sizeof(HashEl));
     el->key = key;
     el->data = data;
     el->next = NULL;
@@ -99,7 +99,7 @@ bool hash_remove(const char *key, HashTable *ht) {
 
     if (prev == NULL) {           // if its first el. in LL
         if (temp->next == NULL) { // if its the only el. in LL
-            ht->arr[idx] = (HashEl){0};
+            ht->arr[idx] = (HashEl){.key = NULL, .data = NULL, .next = NULL};
         } else {
             HashEl *next = temp->next;
             ht->arr[idx] = *next;

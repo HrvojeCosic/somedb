@@ -21,12 +21,12 @@ START_TEST(initialize) {
 END_TEST
 
 START_TEST(insert_find) {
-    val1 = malloc(sizeof(page_id_t));
-    val2 = malloc(sizeof(page_id_t));
-    val3 = malloc(sizeof(page_id_t));
-    key1 = malloc(sizeof(char) * 2);
-    key2 = malloc(sizeof(char) * 2);
-    key3 = malloc(sizeof(char) * 3);
+    val1 = (page_id_t *)malloc(sizeof(page_id_t));
+    val2 = (page_id_t *)malloc(sizeof(page_id_t));
+    val3 = (page_id_t *)malloc(sizeof(page_id_t));
+    key1 = (char *)malloc(sizeof(char) * 2);
+    key2 = (char *)malloc(sizeof(char) * 2);
+    key3 = (char *)malloc(sizeof(char) * 3);
     *val1 = 1;
     *val2 = 2;
     *val3 = 3;
@@ -53,9 +53,9 @@ START_TEST(insert_find) {
     /**
      *Test overwriting duplicate keys
      */
-    char *key2_overwrite = malloc(sizeof(char) * 2);
+    char *key2_overwrite = (char *)malloc(sizeof(char) * 2);
     strncpy(key2_overwrite, "2", 2);
-    page_id_t *val2_overwrite = malloc(sizeof(page_id_t));
+    page_id_t *val2_overwrite = (page_id_t *)malloc(sizeof(page_id_t));
     *val2_overwrite = 33;
     hash_insert(key2_overwrite, val2_overwrite, ht);
     HashEl *overwritten = hash_find(key2, ht);
@@ -69,9 +69,9 @@ START_TEST(remove_entry) {
     ck_assert_ptr_null(hash_find(key2, ht));
     hash_insert(key3, val3, ht);
     hash_remove(key3, ht); // Remove first element in a multiple-element bucket
-    page_id_t *val3_second = malloc(sizeof(page_id_t));
+    page_id_t *val3_second = (page_id_t *)malloc(sizeof(page_id_t));
     *val3_second = 32;
-    char *key3_second = malloc(sizeof(char) * 3);
+    char *key3_second = (char *)malloc(sizeof(char) * 3);
     hash_insert(key3_second, val3_second, ht);
     hash_remove(key1, ht);
 }

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 ClockReplacer *clock_replacer_init(size_t capacity) {
-    ClockReplacer *replacer = malloc(sizeof(ClockReplacer));
+    ClockReplacer *replacer = (ClockReplacer *)malloc(sizeof(ClockReplacer));
     RWLOCK latch;
     RWLOCK_INIT(&latch);
 
@@ -19,7 +19,7 @@ ClockReplacer *clock_replacer_init(size_t capacity) {
 }
 
 static char *frame_to_str(frame_id_t frame_id) {
-    char *str = malloc(sizeof(char) * 11);
+    char *str = (char *)malloc(sizeof(char) * 11);
     snprintf(str, 11, "%d", frame_id);
     return str;
 }
@@ -32,11 +32,11 @@ frame_id_t evict(ClockReplacer *replacer) {
         replacer->hand = replacer->frames->head;
 
     for (size_t i = 0; i < replacer->frames->size; i++) {
-        char *curr_frame = replacer->hand->value;
+        char *curr_frame = (char *)replacer->hand->value;
         HashEl *frame_info = hash_find(curr_frame, replacer->frame_table);
 
         if (*(bool *)frame_info->data == true) {
-            bool *ref_bit = malloc(sizeof(bool));
+            bool *ref_bit = (bool *)malloc(sizeof(bool));
             *ref_bit = false;
             hash_insert(curr_frame, ref_bit, replacer->frame_table);
             replacer->hand =
@@ -65,7 +65,7 @@ void clock_replacer_unpin(frame_id_t *frame_id, ClockReplacer *replacer) {
         return;
     }
 
-    bool *unpinned = malloc(sizeof(bool));
+    bool *unpinned = (bool *)malloc(sizeof(bool));
     *unpinned = true;
     hash_insert(frame_str, unpinned, replacer->frame_table);
     RWLOCK_UNLOCK(&replacer->latch);

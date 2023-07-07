@@ -4,7 +4,7 @@
 #include <string.h>
 
 CircularList *circular_list_init(size_t capacity) {
-    CircularList *cl = malloc(sizeof(CircularList));
+    CircularList *cl = (CircularList *)malloc(sizeof(CircularList));
     cl->head = NULL;
     cl->size = 0;
     cl->capacity = capacity;
@@ -26,7 +26,8 @@ CircularListNode *circular_list_insert(void *value, CircularList *cl) {
     if (cl->size == cl->capacity || value == NULL)
         return NULL;
 
-    CircularListNode *node = malloc(sizeof(CircularListNode));
+    CircularListNode *node =
+        (CircularListNode *)malloc(sizeof(CircularListNode));
     node->value = value;
     node->next = cl->head;
 
@@ -43,7 +44,7 @@ static void free_cl_node(CircularListNode **node) {
 }
 
 static bool are_equal(void *val1, void *val2) {
-    return (val1 == val2 || strcmp(val1, val2) == 0);
+    return (val1 == val2 || strcmp((char *)val1, (char *)val2) == 0);
 }
 
 void circular_list_destroy(CircularList **cl) {

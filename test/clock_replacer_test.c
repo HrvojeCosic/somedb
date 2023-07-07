@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 static char *frame_to_str(frame_id_t frame_id) {
-    char *str = malloc(sizeof(char) * 11);
+    char *str = (char *)malloc(sizeof(char) * 11);
     snprintf(str, 11, "%d", frame_id);
     return str;
 }
@@ -26,11 +26,11 @@ START_TEST(pin_unpin) {
         /**
          * UNPIN
          */
-        frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
+        frame_id_t *fid_ptr = (frame_id_t *)malloc(sizeof(frame_id_t));
         *fid_ptr = fid;
         clock_replacer_unpin(fid_ptr, replacer);
 
-        char *fid_str = malloc(sizeof(char) * 11);
+        char *fid_str = (char *)malloc(sizeof(char) * 11);
         snprintf(fid_str, 11, "%d", fid);
         HashEl *found = hash_find(fid_str, replacer->frame_table);
         ck_assert_ptr_nonnull(found);
@@ -48,7 +48,7 @@ START_TEST(pin_unpin) {
 
 START_TEST(victim) {
     for (frame_id_t fid = 0; fid < 3; fid++) {
-        frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
+        frame_id_t *fid_ptr = (frame_id_t *)malloc(sizeof(frame_id_t));
         *fid_ptr = fid;
         clock_replacer_unpin(fid_ptr, replacer);
     }
@@ -59,11 +59,11 @@ START_TEST(victim) {
      * Unpin frames 0 and 1. Leave frame 2 pinned
      */
     for (frame_id_t fid = 0; fid < 2; fid++) {
-        frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
+        frame_id_t *fid_ptr = (frame_id_t *)malloc(sizeof(frame_id_t));
         *fid_ptr = fid;
         clock_replacer_unpin(fid_ptr, replacer);
     }
-    frame_id_t *fid_ptr = malloc(sizeof(frame_id_t));
+    frame_id_t *fid_ptr = (frame_id_t *)malloc(sizeof(frame_id_t));
     *fid_ptr = 2;
     frame_id_t vic_nonfull_fid = evict(replacer);
     ck_assert_uint_eq(vic_nonfull_fid, *fid_ptr);
