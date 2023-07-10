@@ -17,8 +17,7 @@ BufferPoolManager *new_bpm(const size_t pool_size) {
         free_list[i] = true;
     }
 
-    BufferPoolManager *bpm =
-        (BufferPoolManager *)malloc(sizeof(BufferPoolManager));
+    BufferPoolManager *bpm = (BufferPoolManager *)malloc(sizeof(BufferPoolManager));
     bpm->pool_size = pool_size;
     bpm->pages = pages;
     bpm->free_list = free_list;
@@ -28,8 +27,7 @@ BufferPoolManager *new_bpm(const size_t pool_size) {
     return bpm;
 }
 
-static void add_to_pagetable(page_id_t key, frame_id_t *val,
-                             BufferPoolManager *bpm) {
+static void add_to_pagetable(page_id_t key, frame_id_t *val, BufferPoolManager *bpm) {
     char *key_str = (char *)malloc(sizeof(char) * 5);
     sprintf(key_str, "%u", key);
 
@@ -61,8 +59,7 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
     if (*fid == UINT32_MAX)
         return NULL;
 
-    BpmPage page = {
-        .id = *fid, .data = NULL, .pin_count = 1, .is_dirty = false};
+    BpmPage page = {.id = *fid, .data = NULL, .pin_count = 1, .is_dirty = false};
     memcpy(page.data, read_page(pid), PAGE_SIZE);
     bpm->pages[*fid] = page;
 

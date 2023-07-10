@@ -31,8 +31,7 @@ void destroy_hash(HashTable **ht) {
         HashEl *curr = (*ht)->arr + i;
         HashEl *temp = NULL;
 
-        while (curr && curr->key &&
-               curr->next) { // don't attempt to free an "ht->arr" element
+        while (curr && curr->key && curr->next) { // don't attempt to free an "ht->arr" element
             temp = curr->next;
             curr = curr->next->next;
             free_hash_el(&temp);
@@ -48,9 +47,7 @@ void destroy_hash(HashTable **ht) {
  * Hashing function
  * To be thought about
  */
-static uint8_t hash(const char *key, HashTable *ht) {
-    return atoi(key) % ht->size;
-}
+static uint8_t hash(const char *key, HashTable *ht) { return atoi(key) % ht->size; }
 
 void hash_insert(const char *key, void *data, HashTable *ht) {
     if (key == NULL || data == NULL)

@@ -13,8 +13,7 @@
 /*
  * Pointer to the start of tuple of index idx
  */
-#define TUPLE_INDEX_TO_POINTER_OFFSET(idx)                                     \
-    sizeof(Header) + (idx * sizeof(TuplePtr))
+#define TUPLE_INDEX_TO_POINTER_OFFSET(idx) sizeof(Header) + (idx * sizeof(TuplePtr))
 
 /*
  * Pointer to the start of page header

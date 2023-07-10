@@ -5,7 +5,7 @@
 #include "shared.h"
 
 typedef struct {
-    size_t num_pages; // max number of pages ClockReplacer is required to store
+    size_t num_pages;       // max number of pages ClockReplacer is required to store
     CircularList *frames;   // frames tracked by ClockReplacer
     HashTable *frame_table; // to map each frame to its reference bit
     CircularListNode *hand; // current position of the clock hand

@@ -68,6 +68,7 @@ START_TEST(victim) {
     frame_id_t vic_nonfull_fid = evict(replacer);
     ck_assert_uint_eq(vic_nonfull_fid, *fid_ptr);
 }
+
 END_TEST
 
 Suite *page_suite(void) {

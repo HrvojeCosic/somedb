@@ -19,6 +19,7 @@ START_TEST(initialize) {
     *val2 = 2;
     *val3 = 3;
 }
+
 END_TEST
 
 START_TEST(insert_el) {
@@ -38,6 +39,7 @@ START_TEST(get_next_el) {
     CircularListNode *next_to_1 = circular_list_next(node1, cl);
     ck_assert_ptr_eq(next_to_1, cl->head);
 }
+
 END_TEST
 
 START_TEST(remove_el) {
@@ -45,12 +47,14 @@ START_TEST(remove_el) {
     ck_assert_ptr_eq(node3->next, node1);
     ck_assert_int_eq(cl->size, 2);
 }
+
 END_TEST
 
 START_TEST(destroy) {
     circular_list_destroy(&cl);
     ck_assert_int_eq(cl->size, 0);
 }
+
 END_TEST
 
 Suite *page_suite(void) {

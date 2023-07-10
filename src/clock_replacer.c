@@ -39,8 +39,7 @@ frame_id_t evict(ClockReplacer *replacer) {
             bool *ref_bit = (bool *)malloc(sizeof(bool));
             *ref_bit = false;
             hash_insert(curr_frame, ref_bit, replacer->frame_table);
-            replacer->hand =
-                circular_list_next(replacer->hand, replacer->frames);
+            replacer->hand = circular_list_next(replacer->hand, replacer->frames);
             continue;
         } else {
             frame_id_t frame_id = atoi(frame_info->key);

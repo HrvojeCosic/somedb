@@ -17,6 +17,7 @@ START_TEST(initialize) {
         ck_assert_int_eq(bpm->free_list[i], true);
     }
 }
+
 END_TEST
 
 START_TEST(pin) {
@@ -38,12 +39,14 @@ START_TEST(pin) {
     BpmPage *dup_page1 = new_bpm_page(bpm, pid1);
     ck_assert_ptr_eq(dup_page1, bpm_page1);
 }
+
 END_TEST
 
 START_TEST(unpin) {
     bool ok2 = unpin_page(pid1, false, bpm);
     ck_assert_int_eq(ok2, true);
 }
+
 END_TEST
 
 Suite *page_suite(void) {

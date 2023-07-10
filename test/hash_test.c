@@ -18,6 +18,7 @@ START_TEST(initialize) {
         ck_assert_ptr_null((ht->arr + i)->key);
     }
 }
+
 END_TEST
 
 START_TEST(insert_find) {

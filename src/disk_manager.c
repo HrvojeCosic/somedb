@@ -60,9 +60,7 @@ TuplePtr *add_tuple(void *data) {
 }
 
 void remove_tuple(void *page, uint16_t tuple_idx) {
-    TuplePtr *tuple_ptr =
-        (TuplePtr *)((uintptr_t *)page +
-                     TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx));
+    TuplePtr *tuple_ptr = (TuplePtr *)((uintptr_t *)page + TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx));
     Header *page_header = PAGE_HEADER(page);
     page_header->flags |= COMPACTABLE;
 
@@ -70,9 +68,7 @@ void remove_tuple(void *page, uint16_t tuple_idx) {
 }
 
 void *get_tuple(void *page, uint16_t tuple_idx) {
-    TuplePtr *tuple_ptr =
-        (TuplePtr *)((uintptr_t *)page +
-                     TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx));
+    TuplePtr *tuple_ptr = (TuplePtr *)((uintptr_t *)page + TUPLE_INDEX_TO_POINTER_OFFSET(tuple_idx));
 
     if (tuple_ptr->start_offset == 0) {
         return NULL;
@@ -108,8 +104,7 @@ void defragment(void *page) {
         // Removed tuples' offsets are 0
         if (curr_tuple_ptr->start_offset != 0) {
             AddTupleArgs t_args = {.page = temp,
-                                   .tuple = (uintptr_t *)page +
-                                            curr_tuple_ptr->start_offset,
+                                   .tuple = (uintptr_t *)page + curr_tuple_ptr->start_offset,
                                    .tuple_size = curr_tuple_ptr->size};
             add_tuple(&t_args);
         } else {
@@ -120,8 +115,7 @@ void defragment(void *page) {
     page_header->free_total = temp_header->free_total;
     page_header->flags &= ~COMPACTABLE;
 
-    memcpy((uintptr_t *)PAGE_NO_HEADER(page), (uintptr_t *)PAGE_NO_HEADER(temp),
-           PAGE_SIZE - sizeof(Header));
+    memcpy((uintptr_t *)PAGE_NO_HEADER(page), (uintptr_t *)PAGE_NO_HEADER(temp), PAGE_SIZE - sizeof(Header));
     free(temp);
 }
 

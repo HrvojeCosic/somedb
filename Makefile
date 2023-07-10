@@ -11,7 +11,7 @@ DEPFLAGS=-MP -MD
 CFLAGS=-Wall -Wextra -Wno-missing-braces -g $(foreach DIR,$(INCDIRS),-I$(DIR)) $(OPT) $(DEPFLAGS)
 TESTFLAGS=-lcheck -lsubunit -lm -fsanitize=thread -ltsan
 
-CMDFORMAT=$(shell find . -iname '*.h' -o -iname '*.c' | xargs clang-format -i)
+CMDFORMAT=$(shell find . -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' -o -iname '*.hpp' | xargs clang-format -i)
 
 CFILES=$(foreach DIR,$(CODEDIRS),$(wildcard $(DIR)/*.c))
 OFILES=$(patsubst %.c,%.o,$(CFILES))
