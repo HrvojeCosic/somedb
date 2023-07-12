@@ -5,16 +5,16 @@ BINARY=      bin
 DBFILE=      dbfile.txt
 CODEDIR=     src
 INCDIR=      ./include
-TEST=        test
+TEST_DIR=    test
 BUILD_DIR=   build
-CC=          g++
+CXX=         g++
 OPT=         -O0
 
 #=================================================================================================================
 #### FLAGS & FILES
 #=================================================================================================================
 CFLAGS=-Wall -Wextra -Wno-missing-braces -g -I $(INCDIR) $(OPT) $(DEPFLAGS)
-TESTFLAGS=-lcheck -lsubunit -lm -fsanitize=thread -ltsan
+
 #Generate files including make rules for .h deps
 DEPFLAGS=-MP -MD
 
@@ -24,6 +24,7 @@ OFILES_C=$(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(CFILES)))
 OFILES_CPP=$(patsubst %.cpp, $(BUILD_DIR)/%.o, $(notdir $(CPPFILES)))
 CPPFILES=$(foreach DIR,$(CODEDIR),$(wildcard $(DIR)/*.cpp))
 DEPFILES=$(patsubst %.c, %.d, $(CFILES))
+-include $(DEPFILES)
 
 #=================================================================================================================
 #### BUILD
@@ -31,13 +32,13 @@ DEPFILES=$(patsubst %.c, %.d, $(CFILES))
 all: $(BINARY)
 
 $(BINARY): $(OFILES_C) $(OFILES_CPP)
-	$(CC) -o $@ $^
+	$(CXX) -o $@ $^
 
 $(BUILD_DIR)/%.o: $(CODEDIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@ 
+	$(CXX) $(CFLAGS) -c $< -o $@ 
 
 $(BUILD_DIR)/%.o: $(CODEDIR)/%.cpp | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@ 
+	$(CXX) $(CFLAGS) -c $< -o $@ 
 
 $(BUILD_DIR): 
 	mkdir $@
@@ -45,23 +46,36 @@ $(BUILD_DIR):
 #=================================================================================================================
 #### TEST
 #=================================================================================================================
-TESTS=$(wildcard $(TEST)/*.c)
-TESTBINS=$(patsubst $(TEST)/%.c, $(TEST)/bin/%, $(TESTS))
+TESTS_C=      $(wildcard $(TEST_DIR)/*.c)
+TESTS_CPP=    $(wildcard $(TEST_DIR)/*.cpp)
+TESTS=        $(TESTS_C) $(TESTS_CPP)
 
-test: $(TEST)/bin $(TESTBINS)
+TESTBINS_C=   $(patsubst $(TEST_DIR)/%.c, $(TEST_DIR)/bin/%, $(TESTS_C))
+TESTBINS_CPP= $(patsubst $(TEST_DIR)/%.cpp, $(TEST_DIR)/bin/%, $(TESTS_CPP))
+TESTBINS=     $(TESTBINS_C) $(TESTBINS_CPP)
+
+TESTFLAGS=  -fsanitize=thread -ltsan
+GTEST_LIBS= -lgtest -lgtest_main -lpthread
+CHECK_LIBS= -lcheck -lsubunit -lm
+
+
+test: $(TEST_DIR)/bin $(TESTBINS)
 	@for test in $(TESTBINS) ; do ./$$test ; done
 
-$(TEST)/bin/%: $(TEST)/%.c $(CFILES)
-	$(CC) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(TESTFLAGS)
+$(TEST_DIR)/bin/%: $(TEST_DIR)/%.c $(CFILES)
+	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(CHECK_LIBS) $(TESTFLAGS)
 
-$(TEST)/bin:
-	mkdir $@
+$(TEST_DIR)/bin/%: $(TEST_DIR)/%.cpp $(CPPFILES)
+	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(GTEST_LIBS) $(TESTFLAGS)
+
+$(TEST_DIR)/bin:
+	mkdir -p $@
 
 #=================================================================================================================
 #### GIT & CLEANUP
 #=================================================================================================================
 clean:
-	rm -rf $(BINARY) $(BUILD_DIR) $(OFILES) $(DEPFILES) $(TEST)/bin $(TESTBINS) $(DBFILE)
+	rm -rf $(BINARY) $(BUILD_DIR) $(OFILES) $(DEPFILES) $(TESTBINS) $(DBFILE)
 
 diff:
 	$(shell find . -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' -o -iname '*.hpp' | xargs clang-format -i)
@@ -77,4 +91,19 @@ commit:
 	git commit -m "$(m)"
 	git push
 
--include $(DEPFILES)
+#=================================================================================================================
+#### PACKAGES SETUP
+#=================================================================================================================
+install_pckgs: install_libgtest install_check
+
+install_libgtest:
+	sudo apt-get install libgtest-dev
+	cd /usr/src/gtest; \
+		sudo cmake CMakeLists.txt; \
+		sudo make; \
+		sudo cp ./lib/*.a /usr/lib;
+
+install_check:
+	dpkg -l | grep 'check.*unit test framework for C' || (echo "installing Check, C testing framework" && sudo apt-get install check)
+
+
