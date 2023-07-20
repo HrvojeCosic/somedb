@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-HashTable *init_hash(uint8_t size) {
+HashTable *init_hash(uint32_t size) {
     HashTable *ht = (HashTable *)malloc(sizeof(HashTable));
     ht->size = size;
     ht->arr = (HashEl *)calloc(sizeof(HashEl), size);
@@ -27,7 +27,7 @@ void destroy_hash(HashTable **ht) {
     if (ht == NULL || *ht == NULL)
         return;
 
-    for (uint8_t i = 0; i < (*ht)->size; i++) {
+    for (uint16_t i = 0; i < (*ht)->size; i++) {
         HashEl *curr = (*ht)->arr + i;
         HashEl *temp = NULL;
 
@@ -47,13 +47,13 @@ void destroy_hash(HashTable **ht) {
  * Hashing function
  * To be thought about
  */
-static uint8_t hash(const char *key, HashTable *ht) { return atoi(key) % ht->size; }
+static uint16_t hash(const char *key, HashTable *ht) { return atoi(key) % ht->size; }
 
 void hash_insert(const char *key, void *data, HashTable *ht) {
     if (key == NULL || data == NULL)
         return;
 
-    uint8_t idx = hash(key, ht);
+    uint16_t idx = hash(key, ht);
 
     HashEl *el = (HashEl *)malloc(sizeof(HashEl));
     el->key = key;
@@ -82,7 +82,7 @@ void hash_insert(const char *key, void *data, HashTable *ht) {
 }
 
 bool hash_remove(const char *key, HashTable *ht) {
-    uint8_t idx = hash(key, ht);
+    uint16_t idx = hash(key, ht);
     HashEl *temp = ht->arr + idx;
     HashEl *prev = NULL;
 
@@ -111,7 +111,7 @@ bool hash_remove(const char *key, HashTable *ht) {
 }
 
 HashEl *hash_find(const char *key, HashTable *ht) {
-    uint8_t idx = hash(key, ht);
+    uint16_t idx = hash(key, ht);
     HashEl *temp = ht->arr + idx;
 
     if (!temp->key)

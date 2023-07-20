@@ -2,13 +2,13 @@
 #### GENERAL VARIABLES
 #=================================================================================================================
 BINARY=      bin
-DBFILE=      dbfile.txt
 CODEDIR=     src
 INCDIR=      ./include
 TEST_DIR=    test
 BUILD_DIR=   build
 CXX=         g++
 OPT=         -O0
+CPP_VER=     -std=c++20
 
 #=================================================================================================================
 #### FLAGS & FILES
@@ -38,7 +38,7 @@ $(BUILD_DIR)/%.o: $(CODEDIR)/%.c | $(BUILD_DIR)
 	$(CXX) $(CFLAGS) -c $< -o $@ 
 
 $(BUILD_DIR)/%.o: $(CODEDIR)/%.cpp | $(BUILD_DIR)
-	$(CXX) $(CFLAGS) -c $< -o $@ 
+	$(CXX) $(CPP_VER) $(CFLAGS) -c $< -o $@ 
 
 $(BUILD_DIR): 
 	mkdir $@
@@ -66,7 +66,7 @@ $(TEST_DIR)/bin/%: $(TEST_DIR)/%.c $(CFILES)
 	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(CHECK_LIBS) $(TESTFLAGS)
 
 $(TEST_DIR)/bin/%: $(TEST_DIR)/%.cpp $(CPPFILES)
-	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(GTEST_LIBS) $(TESTFLAGS)
+	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.cpp,$(CPPFILES)) $(GTEST_LIBS) $(TESTFLAGS)
 
 $(TEST_DIR)/bin:
 	mkdir -p $@
@@ -75,7 +75,7 @@ $(TEST_DIR)/bin:
 #### GIT & CLEANUP
 #=================================================================================================================
 clean:
-	rm -rf $(BINARY) $(BUILD_DIR) $(OFILES) $(DEPFILES) $(TESTBINS) $(DBFILE)
+	rm -rf $(BINARY) $(BUILD_DIR) $(OFILES) $(DEPFILES) $(TESTBINS)
 
 diff:
 	$(shell find . -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' -o -iname '*.hpp' | xargs clang-format -i)

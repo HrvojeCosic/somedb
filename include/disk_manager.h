@@ -1,29 +1,43 @@
 #pragma once
 
+#include "hash.h"
 #include "shared.h"
 #include <stdint.h>
 
 #define PAGE_SIZE 4096
+#define MAX_PAGES 500     // max number of pages in a file
+#define START_USER_PAGE 1 // first user page_id (preceding pages are reserved by the system)
+#define DBFILES_DIR "db_files"
 
-/*
- * Pointer to the page memory after it's header
- */
-#define PAGE_NO_HEADER(page) page + sizeof(Header)
-
-/*
- * Pointer to the start of tuple of index idx
- */
+#define PAGE_NO_HEADER(page) page + sizeof(Header) // Pointer to the page memory after it's header
 #define TUPLE_INDEX_TO_POINTER_OFFSET(idx) sizeof(Header) + (idx * sizeof(TuplePtr))
+#define PAGE_HEADER(page) (Header *)page // Pointer to the start of page header
 
-/*
- * Pointer to the start of page header
- */
-#define PAGE_HEADER(page) (Header *)page
-
-/*
- * Page header flags
- */
+// Page header flags
 #define COMPACTABLE (1 << 7)
+
+/*
+ * NOTE: first page in any database file (page_id = 0) is reserved for a file header including metadata about contents
+ * of the database file
+ */
+
+/**
+ * For a good explanation of this struct, see (under "Page Directory Implementation"):
+ * https://cs186berkeley.net/notes/note3/ Current idea is that there is only ever one TablePageDirectory linked list
+ * stored in memory and getting updated as needed
+ */
+typedef struct TablePageDirectory {
+    char table_name[30]; // page directory is being tracked for each table (file) in the database
+    HashTable *page_directory;
+    TablePageDirectory *next; // pointer to the page directory of the next table
+} PageDirectory;
+
+typedef struct {
+    uint16_t keys_start;   // offset to beginning of page_id array
+    uint16_t values_start; // offset to beginning of array of file offsets corresponding to each key
+    uint16_t
+        entry_num; // current number of entries in the page directory. Useful for knowing the length of keys/values arrs
+} PageDirectoryHeader;
 
 typedef struct {
     page_id_t id;
@@ -48,34 +62,41 @@ typedef struct {
  * Type of argument for add_tuple
  */
 typedef struct {
-    void *page;
+    page_id_t page_id;
     void *tuple;
     uint16_t tuple_size;
 } AddTupleArgs;
 
 /*
- * Creates a database file if it doesn't already exist.
- * Returns a file descriptor of a database file
+ * Creates a new disk manager, responsible to manage the database file of given FILENAME
  */
-int db_file();
+// DiskManager *new_disk_manager(char *filename);
 
 /*
- * Closes a database
+ * Free disk_manager memory allocations
  */
-void shut_down_db();
+// void destroy_disk_manager(DiskManager *disk_manager);
 
 /*
- * Allocates memory for a new page of the given id and returns a pointer to it's
- * beginning
+ * Creates a database file for a TABLE_NAME if it doesn't already exist.
+ * Returns a file descriptor of a (new) database file
  */
-void *new_page(page_id_t id);
+int table_file(char *table_name);
+
+void close_table_file(char *table_name);
+
+/*
+ * Allocates memory for a new page for the provided table and returns its page_id.
+ * Returns 0 if page can not be allocated. Returning 0 is fine because its not a valid page id for the user stored data
+ */
+page_id_t new_page(char *table_name);
 
 /*
  * Returns a pointer to the beginning of the tuple with the given index at the
- * specified page, or a null pointer if the tuple does not exist in the given
+ * specified page offset, or a null pointer if the tuple does not exist in the given
  * page
  */
-void *get_tuple(void *page, uint16_t tuple_index);
+void *get_tuple(page_id_t pid, uint16_t tuple_idx);
 
 /*
  * Removes tuple of the specified page at the specified index
@@ -90,17 +111,16 @@ void remove_tuple(void *page, uint16_t tuple_idx);
 void defragment(void *page);
 
 /*
- * Writes contents of the given page to file with the specified file descriptor
- * fd
+ * Writes raw DATA to the offset of PAGE_ID to a database table file of TABLE_NAME
  */
-void write_page(void *page);
+void write_page(page_id_t page_id, char *table_name, void *data);
 
 /*
- * Reads contents of the page of specified page_id belonging to a file of
- * specified file descriptor fd into memory and returns a pointer to its
- * beginning
+ * Reads serialized contents of the page of specified page_id into memory and returns a pointer to its beginning.
+ * Serialization policy can be found in seriailze.h
  */
-void *read_page(page_id_t id);
+
+uint8_t *read_page(page_id_t page_id, char *table_name);
 
 /*
  * Adds given tuple to the given page and returns a pointer to beginning of
@@ -113,3 +133,8 @@ TuplePtr *add_tuple(void *data);
  * TuplePtrList
  */
 TuplePtrList get_tuple_ptr_list(void *page);
+
+/*
+ * Currently only used for testing. It just removes the database file of the particular table
+ */
+void remove_table(char *table_name);

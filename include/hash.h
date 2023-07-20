@@ -11,13 +11,13 @@ typedef struct HashEl {
 
 typedef struct {
     HashEl *arr;
-    uint8_t size;
+    uint16_t size;
 } HashTable;
 
 /*
  * Initializes and returns a hash table of the specified size
  */
-HashTable *init_hash(uint8_t size);
+HashTable *init_hash(uint32_t size);
 
 /*
  * Inserts a HashEl of provided KEY and DATA into a hash table HT
