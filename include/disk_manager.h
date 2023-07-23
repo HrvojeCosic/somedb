@@ -21,7 +21,7 @@
 #define START_COLUMNS_INFO 1
 
 #define PAGE_NO_HEADER(page) page + sizeof(Header) // Pointer to the page memory after it's header
-#define TUPLE_INDEX_TO_POINTER_OFFSET(idx) sizeof(Header) + (idx * sizeof(TuplePtr))
+#define TUPLE_INDEX_TO_TUPLE_POINTER_OFFSET(idx) PAGE_HEADER_SIZE + (idx * TUPLE_PTR_SIZE)
 #define PAGE_HEADER(page) (Header *)page // Pointer to the start of page header
 #define PID_TO_PAGE_DIRECTORY_OFFSET(pid) pid * 2
 #define SCHEMA_COLUMN_SIZE(col_name_len)                                                                               \
@@ -134,10 +134,10 @@ page_id_t new_page(const char *table_name);
 Header extract_header(uint8_t *page, page_id_t page_id);
 
 /*
- * Returns a pointer to the beginning of the tuple with the given RECORD_ID
+ * Returns a pointer to the beginning of raw tuple data with the given RECORD_ID
  * or a null pointer if the tuple does not exist in the page id provided in RID
  */
-void *get_tuple(RID rid, const char *table_name);
+uint8_t *get_tuple(RID rid, const char *table_name);
 
 /*
  * Removes tuple of the specified page at the specified index

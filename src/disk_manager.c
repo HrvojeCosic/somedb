@@ -81,6 +81,17 @@ Header extract_header(uint8_t *page, page_id_t page_id) {
     return header;
 }
 
+TuplePtr extract_tuple_ptr(uint8_t *page, uint32_t slot_num) {
+    TuplePtr data;
+
+    uint8_t tuple_ptr_buf[TUPLE_PTR_SIZE];
+    memcpy(tuple_ptr_buf, page + TUPLE_INDEX_TO_TUPLE_POINTER_OFFSET(slot_num), sizeof(uint16_t));
+    data.start_offset = decode_uint16(tuple_ptr_buf);
+    data.size = decode_uint16(tuple_ptr_buf + sizeof(uint16_t));
+    
+    return data;
+}
+
 static void construct_page_header_buf(uint8_t *page, Header header) {
     encode_uint16(header.free_start, page);
     encode_uint16(header.free_end, page + sizeof(uint16_t));
@@ -357,24 +368,17 @@ TuplePtr *add_tuple(void *data_args) {
 //     tuple_ptr->start_offset = 0;
 // }
 
-void *get_tuple(RID rid, const char *table_name) {
-    void *page = read_page(rid.pid, table_name);
-    TuplePtr *tuple_ptr = (TuplePtr *)((uintptr_t *)page + TUPLE_INDEX_TO_POINTER_OFFSET(rid.slot_num));
+uint8_t *get_tuple(RID rid, const char *table_name) {
+    uint8_t *page = read_page(rid.pid, table_name);
+    TuplePtr tuple_ptr = extract_tuple_ptr(page, rid.slot_num);
 
-    if (tuple_ptr->start_offset == 0) {
+    if (tuple_ptr.start_offset == 0) {
         return NULL;
     }
 
-    return (uintptr_t *)page + tuple_ptr->start_offset;
+    return page + tuple_ptr.start_offset;
 }
 
-// TuplePtrList get_tuple_ptr_list(void *page) {
-//     Header *header = PAGE_HEADER(page);
-//     TuplePtrList list;
-//     list.start = (TuplePtr *)((uintptr_t *)page + sizeof(Header));
-//     list.length = (header->free_start - sizeof(Header)) / sizeof(TuplePtr);
-//     return list;
-// }
 //
 // void defragment(void *page, DiskManager *disk_manager) {
 //     Header *page_header = PAGE_HEADER(page);

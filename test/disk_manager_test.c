@@ -17,7 +17,6 @@ typedef struct {
 static void *page;
 static page_id_t pid;
 static pthread_t t1, t2;
-static TupleExample *tup_get;
 static const char add_tab1[15] = "test_table1";
 static const char add_tab2[15] = "test_table2";
 static const char add_tab3[15] = "test_table3";
@@ -135,6 +134,7 @@ START_TEST(add_tuple_to_page) {
     uint8_t *page = read_page(pid, add_tuple_tab);
     Header header = extract_header(page, pid);
 
+    // assert new tuple correctness
     uint8_t read_buf[t_ptr1->size];
     memcpy(read_buf, page, 2); // header free start
     ck_assert_uint_eq(decode_uint16(read_buf), PAGE_HEADER_SIZE + TUPLE_PTR_SIZE);
@@ -146,18 +146,23 @@ START_TEST(add_tuple_to_page) {
     memcpy(read_buf, page + t_ptr1->start_offset, t_ptr1->size); // new tuple's "name" string length
     ck_assert_uint_eq(decode_uint16(read_buf), name_len);
     memcpy(read_buf, page + t_ptr1->start_offset + sizeof(uint16_t), name_len); // new tuple's "name" value
-    read_buf[name_len] =
-        '\0'; // read_buf is larger than "name" value, and name is stored as Pascal string, so we just do this
+    // read_buf is larger than "name" value, and name is stored as Pascal string, so we insert null terminator at the end
+    read_buf[name_len] = '\0'; 
     ck_assert_str_eq((char *)read_buf, "Pero");
-    memcpy(read_buf, page + t_ptr1->start_offset + name_len + sizeof(uint16_t),
-           sizeof(uint16_t)); // new tuple's "age" value
+    memcpy(read_buf, 
+	    page + t_ptr1->start_offset + name_len + sizeof(uint16_t),
+	    sizeof(uint16_t)
+	  ); // new tuple's "age" value
     ck_assert_uint_eq(decode_uint16(read_buf), 21);
 
-    // RID rid = {.pid = pid, .slot_num = 1};
-    // tup_get = (TupleExample *)get_tuple(rid, add_tuple_tab);
-    // uint8_t *test = (uint8_t *)get_tuple(rid, add_tuple_tab);
-    //  ck_assert_int_eq(tup_get->x, 1);
-    //  ck_assert_str_eq(tup_get->y, "str2");
+    // assert correctness of tuple retreival from disk
+    RID rid = {.pid = pid, .slot_num = 0};
+    uint8_t *tuple_data = get_tuple(rid, add_tuple_tab);
+    uint8_t tuple_data_buf[t_ptr1->size];
+    memcpy(tuple_data_buf, tuple_data, sizeof(uint16_t)); // tuple's "name" string length
+    ck_assert_uint_eq(decode_uint16(tuple_data_buf), name_len);
+    memcpy(tuple_data_buf, tuple_data + sizeof(uint16_t), name_len); // tuple's "name" value
+    ck_assert_str_eq((char*)tuple_data_buf, "Pero");
 }
 
 END_TEST
