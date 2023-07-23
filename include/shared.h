@@ -15,8 +15,8 @@ typedef uint32_t page_id_t;
 typedef uint32_t frame_id_t;
 
 /*
- * Record id (RID) is a unique identifier for a record with information necessary to find the corresponding page, as
- * well as the offset in that page using the slow number
+ * Record id (RID) is a unique identifier for a record with information necessary to
+ * find the corresponding page and the offset in that page using the slot number
  */
 typedef struct {
     page_id_t pid;

@@ -12,4 +12,4 @@ void encode_uint32(uint32_t data, uint8_t *buf);
 uint32_t decode_uint32(uint8_t *buf);
 
 void encode_uint16(uint16_t data, uint8_t *buf);
-uint32_t decode_uint16(uint8_t *buf);
+uint16_t decode_uint16(uint8_t *buf);
