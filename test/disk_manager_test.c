@@ -14,15 +14,13 @@ typedef struct {
     char y[30];
 } TupleExample;
 
-static void *page;
-static page_id_t pid;
 static pthread_t t1, t2;
 static const char add_tab1[15] = "test_table1";
 static const char add_tab2[15] = "test_table2";
 static const char add_tab3[15] = "test_table3";
 static const char add_page_tab[15] = "add_page_test";
 static const char add_tuple_tab[25] = "add_tuple_to_page_test";
-TuplePtr *t_ptr1, *t_ptr2;
+static TuplePtr *t_ptr1, *t_ptr2;
 
 void add_table_teardown(void) {
     remove_table(add_tab1);
@@ -32,8 +30,8 @@ void add_table_teardown(void) {
 
 void add_page_teardown(void) { remove_table(add_page_tab); }
 
-void add_tuple_teardown(void) { 
-    remove_table(add_tuple_tab); 
+void add_tuple_teardown(void) {
+    remove_table(add_tuple_tab);
     free(t_ptr1);
     free(t_ptr2);
 }
@@ -82,10 +80,10 @@ END_TEST
 
 START_TEST(add_page) {
     Column *cols = {0};
-    create_table(add_page_tab, cols, 0);
-    page_id_t pid1 = new_page(add_page_tab);
-    page_id_t pid2 = new_page(add_page_tab);
-    page_id_t pid3 = new_page(add_page_tab);
+    DiskManager *disk_mgr = create_table(add_page_tab, cols, 0);
+    page_id_t pid1 = new_page(disk_mgr);
+    page_id_t pid2 = new_page(disk_mgr);
+    page_id_t pid3 = new_page(disk_mgr);
 
     // all three should get same (first) page id as it's not being occupied by tuples
     // TODO: make it thread safe (track a dirty bit or something)
@@ -93,7 +91,7 @@ START_TEST(add_page) {
     ck_assert_int_eq(pid2, START_USER_PAGE);
     ck_assert_int_eq(pid3, START_USER_PAGE);
 
-    uint8_t *page = read_page(pid1, add_page_tab);
+    uint8_t *page = read_page(pid1, disk_mgr);
     uint8_t *buf;
     // check correct header format
     ck_assert_uint_eq(decode_uint16(page), PAGE_HEADER_SIZE);
@@ -108,8 +106,8 @@ START_TEST(add_tuple_to_page) {
     char cname2[5] = "age";
     Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = STRING},
                       {.name_len = (uint8_t)strlen(cname2), .name = cname2, .type = UINT16}};
-    create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
-    page_id_t pid = new_page(add_tuple_tab);
+    DiskManager *disk_mgr = create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
+    page_id_t pid = new_page(disk_mgr);
 
     const char *col_names[2] = {"name", "age"};
     const char *col_names2[2] = {"wrong_col", "another_wrong_col"};
@@ -120,25 +118,25 @@ START_TEST(add_tuple_to_page) {
     t_ptr1 = (TuplePtr *)malloc(sizeof(TuplePtr));
     t_ptr2 = (TuplePtr *)malloc(sizeof(TuplePtr));
 
-    AddTupleArgs t_args1 = {.table_name = add_tuple_tab,
+    AddTupleArgs t_args1 = {.disk_manager = disk_mgr,
                             .column_names = col_names,
                             .column_values = col_vals,
                             .column_types = col_types,
                             .num_columns = 2,
-			    .tup_ptr_out = t_ptr1};
-    AddTupleArgs t_args2 = {.table_name = add_tuple_tab,
+                            .tup_ptr_out = t_ptr1};
+    AddTupleArgs t_args2 = {.disk_manager = disk_mgr,
                             .column_names = col_names2,
                             .column_values = col_vals,
                             .column_types = col_types,
                             .num_columns = 2,
-			    .tup_ptr_out = t_ptr2};
+                            .tup_ptr_out = t_ptr2};
 
     pthread_create(&t1, NULL, (void *(*)(void *))add_tuple, &t_args1);
     pthread_create(&t2, NULL, (void *(*)(void *))add_tuple, &t_args2);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
-    uint8_t *page = read_page(pid, add_tuple_tab);
+    uint8_t *page = read_page(pid, disk_mgr);
     Header header = extract_header(page, pid);
 
     // assert new tuple correctness
@@ -153,14 +151,14 @@ START_TEST(add_tuple_to_page) {
     memcpy(read_buf, page + t_ptr1->start_offset, t_ptr1->size); // new tuple's "name" string length
     ck_assert_uint_eq(decode_uint16(read_buf), name_len);
     memcpy(read_buf, page + t_ptr1->start_offset + sizeof(uint16_t), name_len); // new tuple's "name" value
-    ck_assert_int_eq(strncmp((char*)read_buf, "Pero", name_len), 0);
+    ck_assert_int_eq(strncmp((char *)read_buf, "Pero", name_len), 0);
     memcpy(read_buf, page + t_ptr1->start_offset + name_len + sizeof(uint16_t),
            sizeof(uint16_t)); // new tuple's "age" value
     ck_assert_uint_eq(decode_uint16(read_buf), 21);
 
     // assert correctness of tuple retreival from disk
     RID rid = {.pid = pid, .slot_num = 0};
-    uint8_t *tuple_data = get_tuple(rid, add_tuple_tab);
+    uint8_t *tuple_data = get_tuple(rid, disk_mgr);
     uint8_t tuple_data_buf[t_ptr1->size];
     memcpy(tuple_data_buf, tuple_data, sizeof(uint16_t)); // tuple's "name" string length
     ck_assert_uint_eq(decode_uint16(tuple_data_buf), name_len);
@@ -170,16 +168,15 @@ START_TEST(add_tuple_to_page) {
 
 END_TEST
 
-//
 // START_TEST(remove_tuple_from_page) {
-//    uint32_t tid = 1;
-//    remove_tuple(page, tid);
-//    ck_assert_ptr_null(get_tuple(pid, tid, disk_manager));
-//    ck_assert_int_eq(header->flags, COMPACTABLE);
-//    ck_assert_int_eq(get_tuple_ptr_list(page).length, 2);
+//     remove_tuple(page, tid);
+//     ck_assert_ptr_null(get_tuple(pid, tid, disk_manager));
+//     ck_assert_int_eq(header->flags, COMPACTABLE);
+//     ck_assert_int_eq(get_tuple_ptr_list(page).length, 2);
 //}
-//
-// END_TEST
+
+END_TEST
+
 //
 // START_TEST(defragment_and_disk_persistance) {
 //    uint16_t total_before = header->free_total;
@@ -199,6 +196,11 @@ END_TEST
 // END_TEST
 //
 
+// for some reason there is a segfault in srunner_run_all() when running with tsan if this doesnt exist??
+START_TEST(x) {}
+
+END_TEST
+
 Suite *page_suite(void) {
     Suite *s;
     TCase *tc_core;
@@ -207,11 +209,12 @@ Suite *page_suite(void) {
 
     tc_core = tcase_create("Core");
 
+    tcase_add_test(tc_core, x);
     tcase_add_test(tc_core, add_table);
     tcase_add_test(tc_core, add_page);
     tcase_add_test(tc_core, add_tuple_to_page);
-    //     tcase_add_test(tc_core, remove_tuple_from_page);
-    //     tcase_add_test(tc_core, defragment_and_disk_persistance);
+    // tcase_add_test(tc_core, remove_tuple_from_page);
+    // tcase_add_test(tc_core, defragment_and_disk_persistance);
 
     tcase_add_checked_fixture(tc_core, NULL, add_table_teardown);
     tcase_add_checked_fixture(tc_core, NULL, add_page_teardown);
@@ -234,8 +237,6 @@ int main(void) {
     srunner_run_all(sr, CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
     srunner_free(sr);
-
-    free(page);
 
     return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

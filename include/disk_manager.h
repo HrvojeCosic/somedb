@@ -30,17 +30,11 @@
 // Page header flags
 #define COMPACTABLE (1 << 7)
 
-/**
- * For a good explanation of this struct, see (under "Page Directory Implementation"):
- * https://cs186berkeley.net/notes/note3/ Current idea is that there is only ever one TablePageDirectory linked list
- * stored in memory and getting updated as needed
- */
-typedef struct TablePageDirectory {
-    char table_name[30]; // page directory is being tracked for each table (file) in the database
-    HashTable *page_directory;
-    TablePageDirectory *next; // pointer to the page directory of the next table
+typedef struct {
+    HashTable *page_directory; // table's page directory in memory representation, for saving some file seeks
+    char *table_name;
     RWLOCK latch;
-} PageDirectory;
+} DiskManager;
 
 typedef struct {
     uint16_t keys_start;   // offset to beginning of page_id array
@@ -86,6 +80,7 @@ typedef struct {
 
 /*
  * Creates a database table with provided COLUMNS if it doesn't already exist under the same TABLE_NAME.
+ * Returns a newly created disk manager instance through which all table changes are made
  *
  * Table database file header consists of multiple metadata pages:
  *  1."page directory" page of the following layout:
@@ -95,7 +90,7 @@ typedef struct {
  *   -triplets of data (column_name_length (8bit uint), column_name_string (variable string), column_data_type (8bit
  * uint)) All data is serialized as described in serialize.h
  */
-void create_table(const char *table_name, Column *columns, uint8_t n_columns);
+DiskManager *create_table(const char *table_name, Column *columns, uint8_t n_columns);
 
 /*
  * Returns a file descriptor of a database file of given TABLE_NAME
@@ -119,7 +114,7 @@ int table_file(const char *table_name);
  */
 #define PAGE_HEADER_SIZE 5
 #define TUPLE_PTR_SIZE 4
-page_id_t new_page(const char *table_name);
+page_id_t new_page(DiskManager *disk_manager);
 
 /*
  * Takes in page bytes and returns a constructed header of the page
@@ -128,9 +123,10 @@ Header extract_header(uint8_t *page, page_id_t page_id);
 
 /*
  * Returns a pointer to the beginning of raw tuple data with the given RECORD_ID
- * or a null pointer if the tuple does not exist in the page id provided in RID
+ * or a null pointer if the tuple does not exist in the page id provided in RID.
+ * Record is searched for in the table found inside DISK_MANAGER
  */
-uint8_t *get_tuple(RID rid, const char *table_name);
+uint8_t *get_tuple(RID rid, DiskManager *disk_manager);
 
 /*
  * Removes tuple of the specified page at the specified index
@@ -145,24 +141,25 @@ void remove_tuple(void *page, uint16_t tuple_idx);
 void defragment(void *page);
 
 /*
- * Writes raw DATA to the offset of PAGE_ID to a database table file of TABLE_NAME
+ * Writes raw DATA to the offset of PAGE_ID to a database table file of DISK_MANAGER's table
  */
-void write_page(page_id_t page_id, const char *table_name, void *data);
+void write_page(page_id_t page_id, DiskManager *disk_manager, void *data);
 
 /*
- * Reads serialized contents of the page of specified page_id into memory and returns a pointer to its beginning.
+ * Reads serialized contents of the page of specified page_id of a table inside disk_manager into
+ * memory and returns a pointer to its beginning.
  * Serialization policy can be found in seriailze.h
  */
-
-uint8_t *read_page(page_id_t page_id, const char *table_name);
+uint8_t *read_page(page_id_t page_id, DiskManager *disk_manager);
 
 /*
- * Adds tuple to a page in the provided table and sets a pointer to beginning of
+ * Adds tuple to a page through the provided table's disk manager and sets a pointer to beginning of
  * added tuple in the tup_ptr_out data argument. If the page is full, immediately returns a null pointer
  */
 void add_tuple(void *data_args);
+
 typedef struct {
-    const char *table_name;
+    DiskManager *disk_manager;
     const char **column_names;
     ColumnValue *column_values;
     ColumnType *column_types;

@@ -59,7 +59,6 @@ void hash_insert(void *hash_insert_args) {
     const char *key = args->key;
     HashTable *ht = args->ht;
     void *data = args->data;
-    
 
     if (key == NULL || data == NULL)
         return;
@@ -110,9 +109,10 @@ void hash_remove(void *hash_remove_args) {
     }
 
     if (temp == NULL) {
-	RWLOCK_UNLOCK(&ht->latch);
-	if(args->success_out) *args->success_out = false;
-	return;
+        RWLOCK_UNLOCK(&ht->latch);
+        if (args->success_out)
+            *args->success_out = false;
+        return;
     }
 
     if (prev == NULL) {           // if its first el. in LL
@@ -128,7 +128,8 @@ void hash_remove(void *hash_remove_args) {
         prev->next = temp->next;
         free_hash_el(&temp);
     }
-    if(args->success_out) *args->success_out = true;
+    if (args->success_out)
+        *args->success_out = true;
     RWLOCK_UNLOCK(&ht->latch);
     return;
 }

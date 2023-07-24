@@ -38,14 +38,14 @@ frame_id_t evict(ClockReplacer *replacer) {
         if (*(bool *)frame_info->data == true) {
             bool *ref_bit = (bool *)malloc(sizeof(bool));
             *ref_bit = false;
-	    HashInsertArgs in_args = {.key = curr_frame, .data = ref_bit, .ht = replacer->frame_table };
-	    hash_insert(&in_args);
+            HashInsertArgs in_args = {.key = curr_frame, .data = ref_bit, .ht = replacer->frame_table};
+            hash_insert(&in_args);
             replacer->hand = circular_list_next(replacer->hand, replacer->frames);
             continue;
         } else {
             frame_id_t frame_id = atoi(frame_info->key);
-	    HashRemoveArgs rm_args = {.key = curr_frame, .ht = replacer->frame_table};
-	    hash_remove(&rm_args);
+            HashRemoveArgs rm_args = {.key = curr_frame, .ht = replacer->frame_table};
+            hash_remove(&rm_args);
             circular_list_remove(curr_frame, replacer->frames);
             RWLOCK_UNLOCK(&replacer->latch);
             return frame_id;
@@ -68,7 +68,7 @@ void clock_replacer_unpin(frame_id_t *frame_id, ClockReplacer *replacer) {
 
     bool *unpinned = (bool *)malloc(sizeof(bool));
     *unpinned = true;
-    HashInsertArgs in_args = {.key = frame_str, .data = unpinned, .ht = replacer->frame_table };
+    HashInsertArgs in_args = {.key = frame_str, .data = unpinned, .ht = replacer->frame_table};
     hash_insert(&in_args);
     RWLOCK_UNLOCK(&replacer->latch);
 }
@@ -77,12 +77,12 @@ void clock_replacer_pin(frame_id_t *frame_id, ClockReplacer *replacer) {
     RWLOCK_WRLOCK(&replacer->latch);
 
     char *frame_str = frame_to_str(*frame_id);
-    bool *ok = (bool*)malloc(sizeof(bool));
+    bool *ok = (bool *)malloc(sizeof(bool));
     HashRemoveArgs rm_args = {.key = frame_str, .ht = replacer->frame_table, .success_out = ok};
     hash_remove(&rm_args);
     if (ok) {
         circular_list_remove(frame_str, replacer->frames);
-	free(ok);
+        free(ok);
     }
 
     RWLOCK_UNLOCK(&replacer->latch);

@@ -13,58 +13,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static PageDirectory *pdm_instance_ = NULL;
-
-void close_table_file(char *table_name) { close(table_file(table_name)); }
-
-// TODO: make it thread safe
-static PageDirectory *page_directory_manager_instance() {
-    // if it already exists, return instance, otherwise initialize page directory manager
-    if (pdm_instance_ != NULL)
-        return pdm_instance_;
-
-    DIR *directory;
-    struct dirent *entry;
-    directory = opendir(DBFILES_DIR);
-
-    PageDirectory *head = NULL;
-    while ((entry = readdir(directory)) != NULL) {
-        if (entry->d_type != DT_REG)
-            continue;
-
-        char path[50] = {0};
-        sprintf(path, "%s/%s", DBFILES_DIR, entry->d_name);
-        char *table_name = strtok(entry->d_name, ".");
-
-        int fd = open(path, O_RDONLY);
-        void *buf = malloc(PAGE_SIZE);
-        read(fd, buf, PAGE_SIZE);
-
-        PageDirectory *table_page_dir = (PageDirectory *)malloc(sizeof(PageDirectory));
-        table_page_dir->next = head;
-        table_page_dir->page_directory = init_hash(MAX_PAGES);
-        strcpy(table_page_dir->table_name, table_name);
-
-        uint8_t *page_dir = read_page(0, table_name);
-        for (uint16_t i = START_USER_PAGE; i < MAX_PAGES; i++) {
-            char *pid_key = (char *)malloc(sizeof(char) * 11);
-            sprintf(pid_key, "%u", i);
-
-            uint16_t *free_space = (uint16_t *)malloc(sizeof(size_t));
-            *free_space = decode_uint16(page_dir + (i * 4) + 2);
-
-	    HashInsertArgs in_args = {.key = pid_key, .data = free_space, .ht = table_page_dir->page_directory };
-	    hash_insert(&in_args);
-        }
-
-        head = table_page_dir;
-        close(fd);
-        free(buf);
-    }
-    pdm_instance_ = head;
-    closedir(directory);
-    return pdm_instance_;
-}
+void close_table_file(DiskManager *disk_manager) { close(table_file(disk_manager->table_name)); }
 
 Header extract_header(uint8_t *page, page_id_t page_id) {
     uint16_t free_start = decode_uint16(page);
@@ -109,16 +58,24 @@ int table_file(const char *table_name) {
     return fd;
 }
 
-void create_table(const char *table_name, Column *columns, uint8_t n_columns) {
+DiskManager *create_table(const char *table_name, Column *columns, uint8_t n_columns) {
+    DiskManager *disk_mgr = (DiskManager *)malloc(sizeof(DiskManager));
+    disk_mgr->page_directory = init_hash(MAX_PAGES);
+    disk_mgr->table_name = (char *)malloc(sizeof(char) * 15);
+    strcpy(disk_mgr->table_name, table_name);
+    RWLOCK l;
+    RWLOCK_INIT(&l);
+    disk_mgr->latch = l;
+
     int fd = table_file(table_name);
 
     off_t offset = lseek(fd, 0, SEEK_END);
     if (offset != 0) {
         printf("Table with that name already exists");
-        return;
+        return NULL;
     }
 
-    // Setup a database file header
+    // Setup a database file header and an in memory page directory
     uint8_t pid_buf[2], free_space_buf[2], total_buf[4];
     for (page_id_t pid = 0; pid < MAX_PAGES; pid++) {
         encode_uint16(pid, pid_buf);
@@ -126,6 +83,16 @@ void create_table(const char *table_name, Column *columns, uint8_t n_columns) {
         memcpy(total_buf, pid_buf, 2);
         memcpy(total_buf + 2, free_space_buf, 2);
         write(fd, total_buf, 4);
+
+        if (pid < START_USER_PAGE)
+            continue; // only write user pages in memory page dir
+
+        uint16_t *free_space = (uint16_t *)malloc(sizeof(uint16_t));
+        char *pid_str = (char *)malloc(sizeof(char) * 7);
+        sprintf(pid_str, "%d", pid);
+        *free_space = PAGE_SIZE;
+        HashInsertArgs insert_args = {.key = pid_str, .data = free_space, .ht = disk_mgr->page_directory};
+        hash_insert(&insert_args);
     }
 
     // Add padding to the header page up to PAGE_SIZE (necessary for reading page into memory)
@@ -147,24 +114,7 @@ void create_table(const char *table_name, Column *columns, uint8_t n_columns) {
     }
     write(fd, col_buf, PAGE_SIZE);
 
-    // Add table to page directory manager
-    PageDirectory *new_page_dir = (PageDirectory *)malloc(sizeof(PageDirectory));
-    strcpy(new_page_dir->table_name, table_name);
-    new_page_dir->page_directory = init_hash(MAX_PAGES);
-
-    for (uint16_t i = START_USER_PAGE; i < MAX_PAGES; i++) {
-        char *pid_key = (char *)malloc(sizeof(char) * 11);
-        sprintf(pid_key, "%u", i);
-
-        uint16_t *free_space = (uint16_t *)malloc(sizeof(size_t));
-        *free_space = PAGE_SIZE;
-	HashInsertArgs in_args = {.key = pid_key, .data = free_space, .ht = new_page_dir->page_directory };
-        hash_insert(&in_args);
-    }
-
-    new_page_dir->next = page_directory_manager_instance();
-    pdm_instance_ = new_page_dir;
-    lseek(fd, 0, SEEK_SET);
+    return disk_mgr;
 }
 
 // for test only
@@ -179,11 +129,11 @@ void remove_table(const char *table_name) {
  * Returns true if found, false otherwise.
  * Found page_id is stored in the provided out param
  */
-static bool find_spacious_page(uint16_t size_needed, PageDirectory *table_page_dir, page_id_t *page_id) {
+static bool find_spacious_page(uint16_t size_needed, DiskManager *disk_manager, page_id_t *page_id) {
     for (page_id_t i = START_USER_PAGE; i < MAX_PAGES; i++) {
         char pid_key[11];
         sprintf(pid_key, "%d", i);
-        HashEl *found = hash_find(pid_key, table_page_dir->page_directory);
+        HashEl *found = hash_find(pid_key, disk_manager->page_directory);
         if (found && (size_t)found->data >= size_needed) {
             *page_id = i;
             return true;
@@ -192,56 +142,47 @@ static bool find_spacious_page(uint16_t size_needed, PageDirectory *table_page_d
     return false;
 }
 
-// returns table's page directory or NULL if couldn't find it
-static PageDirectory *find_page_dir(const char *table_name) {
-    PageDirectory *curr = page_directory_manager_instance();
-    while (strcmp(curr->table_name, table_name) != 0) {
-        curr = curr->next;
-        if (!curr)
-            return NULL;
-    }
-    return curr;
-}
-
-page_id_t new_page(const char *table_name) {
+page_id_t new_page(DiskManager *disk_manager) {
     uint8_t *page = (uint8_t *)malloc(PAGE_SIZE);
     page_id_t pid = 0;
-    if (!find_spacious_page(PAGE_SIZE, find_page_dir(table_name), &pid))
+    if (!find_spacious_page(PAGE_SIZE, disk_manager, &pid))
         return 0;
 
+    RWLOCK_WRLOCK(&disk_manager->latch);
     // Construct page header
     Header header = {.free_start = PAGE_HEADER_SIZE, .free_end = PAGE_SIZE - 1, .flags = 0x00};
     header.free_total = header.free_end - header.free_start;
     construct_page_header_buf(page, header);
 
-    write_page(pid, table_name, page);
+    write_page(pid, disk_manager, page);
     free(page);
+    RWLOCK_UNLOCK(&disk_manager->latch);
     return pid;
 }
 
 // Updates the free_space associated with the provided page id in a table's page directory (in memory and on disk)
-static void update_page_dir(const char *table_name, page_id_t pid, uint16_t tuple_size, enum TupleAction act) {
+static void update_page_dir(DiskManager *disk_manager, page_id_t pid, uint16_t tuple_size, enum TupleAction act) {
     char *pid_key = (char *)malloc(sizeof(char) * 11);
     sprintf(pid_key, "%u", pid);
-    PageDirectory *page_dir = find_page_dir(table_name);
-    if (page_dir == NULL) return;
 
     // TODO: make find->remove->insert a single procedure
-    uint16_t curr_free_space = *(uint16_t *)hash_find(pid_key, page_dir->page_directory)->data;
-    HashRemoveArgs rm_args = {.key = pid_key, .ht = page_dir->page_directory};
+    uint16_t curr_free_space = *(uint16_t *)hash_find(pid_key, disk_manager->page_directory)->data;
+    HashRemoveArgs rm_args = {.key = pid_key, .ht = disk_manager->page_directory};
+    RWLOCK_WRLOCK(&disk_manager->latch);
     hash_remove(&rm_args);
     uint16_t *free_space = (uint16_t *)malloc(sizeof(uint16_t));
     *free_space = act == TUPLE_ADD ? curr_free_space - tuple_size : curr_free_space + tuple_size;
-    HashInsertArgs in_args = {.key = pid_key, .data = free_space, .ht = page_dir->page_directory };
+    HashInsertArgs in_args = {.key = pid_key, .data = free_space, .ht = disk_manager->page_directory};
     hash_insert(&in_args);
 
-    int fd = table_file(table_name);
+    int fd = table_file(disk_manager->table_name);
     uint8_t pid_buf[4], free_space_buf[4], total_buf[4];
     encode_uint16(pid, pid_buf);
     encode_uint16(*free_space, free_space_buf);
     memcpy(total_buf, pid_buf, 2);
     memcpy(total_buf + 2, free_space_buf, 2);
     pwrite(fd, total_buf, 4, PID_TO_PAGE_DIRECTORY_OFFSET(pid));
+    RWLOCK_UNLOCK(&disk_manager->latch);
 }
 
 void add_tuple(void *data_args) {
@@ -290,17 +231,18 @@ void add_tuple(void *data_args) {
         }
     }
 
+    RWLOCK_WRLOCK(&data->disk_manager->latch);
     page_id_t *pid = (page_id_t *)malloc(sizeof(page_id_t));
-    find_spacious_page(tuple_size, find_page_dir(data->table_name), pid);
+    find_spacious_page(tuple_size, data->disk_manager, pid);
     if (!pid) {
         printf("Couldn't find available page"); // this can be solved with overflow pages
         return;
     }
-    uint8_t *page = read_page(*pid, data->table_name);
+    uint8_t *page = read_page(*pid, data->disk_manager);
     Header header = extract_header(page, *pid);
 
     // Extract schema info
-    uint8_t *schema = read_page(1, data->table_name);
+    uint8_t *schema = read_page(1, data->disk_manager);
     uint8_t cols_num = *schema + 0;
     schema = schema + START_COLUMNS_INFO;
 
@@ -352,12 +294,13 @@ void add_tuple(void *data_args) {
     header.free_total = header.free_end - header.free_start;
     construct_page_header_buf(page, header);
 
-    write_page(*pid, data->table_name, page);
-    update_page_dir(data->table_name, *pid, tuple_size, TUPLE_ADD);
+    write_page(*pid, data->disk_manager, page);
+    update_page_dir(data->disk_manager, *pid, tuple_size, TUPLE_ADD);
 
     data->tup_ptr_out->size = tuple_ptr.size;
     data->tup_ptr_out->start_offset = tuple_ptr.start_offset;
     free(pid);
+    RWLOCK_UNLOCK(&data->disk_manager->latch);
 }
 
 // void remove_tuple(void *page, uint16_t tuple_idx) {
@@ -368,8 +311,8 @@ void add_tuple(void *data_args) {
 //     tuple_ptr->start_offset = 0;
 // }
 
-uint8_t *get_tuple(RID rid, const char *table_name) {
-    uint8_t *page = read_page(rid.pid, table_name);
+uint8_t *get_tuple(RID rid, DiskManager *disk_manager) {
+    uint8_t *page = read_page(rid.pid, disk_manager);
     TuplePtr tuple_ptr = extract_tuple_ptr(page, rid.slot_num);
 
     if (tuple_ptr.start_offset == 0) {
@@ -414,13 +357,13 @@ uint8_t *get_tuple(RID rid, const char *table_name) {
 //     free(temp);
 // }
 //
-void write_page(page_id_t page_id, const char *table_name, void *data) {
+void write_page(page_id_t page_id, DiskManager *disk_manager, void *data) {
     char pid_str[11];
     sprintf(pid_str, "%d", page_id);
 
     Header *page_header = PAGE_HEADER(data);
 
-    int fd = table_file(table_name);
+    int fd = table_file(disk_manager->table_name);
     int l = lseek(fd, page_id * PAGE_SIZE, SEEK_SET);
     int w = write(fd, data, PAGE_SIZE);
     int f = fsync(fd);
@@ -431,10 +374,10 @@ void write_page(page_id_t page_id, const char *table_name, void *data) {
     }
 }
 
-uint8_t *read_page(page_id_t page_id, const char *table_name) {
+uint8_t *read_page(page_id_t page_id, DiskManager *disk_manager) {
     uint8_t *page = (uint8_t *)malloc(PAGE_SIZE);
 
-    int fd = table_file(table_name);
+    int fd = table_file(disk_manager->table_name);
 
     int offset = page_id * PAGE_SIZE;
     off_t fsize = lseek(fd, 0, SEEK_END);

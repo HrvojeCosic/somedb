@@ -76,7 +76,7 @@ START_TEST(insert_find) {
 START_TEST(remove_entry) {
     HashRemoveArgs rm_args = {.key = key2, .ht = ht};
     pthread_create(&t1, NULL, (void *(*)(void *))hash_remove, &rm_args);
-    pthread_create(&t2, NULL, (void *(*)(void *))hash_remove, &rm_args); //remove sole bucket el.
+    pthread_create(&t2, NULL, (void *(*)(void *))hash_remove, &rm_args); // remove sole bucket el.
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
