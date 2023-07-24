@@ -39,6 +39,7 @@ typedef struct TablePageDirectory {
     char table_name[30]; // page directory is being tracked for each table (file) in the database
     HashTable *page_directory;
     TablePageDirectory *next; // pointer to the page directory of the next table
+    RWLOCK latch;
 } PageDirectory;
 
 typedef struct {
@@ -82,14 +83,6 @@ typedef struct {
     char *name;       // should not include null character
     ColumnType type;
 } Column;
-
-typedef struct {
-    const char *table_name;
-    const char **column_names;
-    ColumnValue *column_values;
-    ColumnType *column_types;
-    uint8_t num_columns;
-} AddTupleArgs;
 
 /*
  * Creates a database table with provided COLUMNS if it doesn't already exist under the same TABLE_NAME.
@@ -164,10 +157,18 @@ void write_page(page_id_t page_id, const char *table_name, void *data);
 uint8_t *read_page(page_id_t page_id, const char *table_name);
 
 /*
- * Adds tuple to a page in the provided table and returns a pointer to beginning of
- * added tuple. If the page is full, immediately returns a null pointer
+ * Adds tuple to a page in the provided table and sets a pointer to beginning of
+ * added tuple in the tup_ptr_out data argument. If the page is full, immediately returns a null pointer
  */
-TuplePtr *add_tuple(void *data_args);
+void add_tuple(void *data_args);
+typedef struct {
+    const char *table_name;
+    const char **column_names;
+    ColumnValue *column_values;
+    ColumnType *column_types;
+    uint8_t num_columns;
+    TuplePtr *tup_ptr_out;
+} AddTupleArgs;
 
 /*
  * Returns information about tuple pointers at the specified page contained in

@@ -13,12 +13,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+static PageDirectory *pdm_instance_ = NULL;
+
 void close_table_file(char *table_name) { close(table_file(table_name)); }
 
-static TablePageDirectory *pdm_instance_ = NULL;
-
 // TODO: make it thread safe
-static TablePageDirectory *page_directory_manager_instance() {
+static PageDirectory *page_directory_manager_instance() {
     // if it already exists, return instance, otherwise initialize page directory manager
     if (pdm_instance_ != NULL)
         return pdm_instance_;
@@ -27,7 +27,7 @@ static TablePageDirectory *page_directory_manager_instance() {
     struct dirent *entry;
     directory = opendir(DBFILES_DIR);
 
-    TablePageDirectory *head = NULL;
+    PageDirectory *head = NULL;
     while ((entry = readdir(directory)) != NULL) {
         if (entry->d_type != DT_REG)
             continue;
@@ -40,7 +40,7 @@ static TablePageDirectory *page_directory_manager_instance() {
         void *buf = malloc(PAGE_SIZE);
         read(fd, buf, PAGE_SIZE);
 
-        TablePageDirectory *table_page_dir = (TablePageDirectory *)malloc(sizeof(TablePageDirectory));
+        PageDirectory *table_page_dir = (PageDirectory *)malloc(sizeof(PageDirectory));
         table_page_dir->next = head;
         table_page_dir->page_directory = init_hash(MAX_PAGES);
         strcpy(table_page_dir->table_name, table_name);
@@ -53,7 +53,8 @@ static TablePageDirectory *page_directory_manager_instance() {
             uint16_t *free_space = (uint16_t *)malloc(sizeof(size_t));
             *free_space = decode_uint16(page_dir + (i * 4) + 2);
 
-            hash_insert(pid_key, free_space, table_page_dir->page_directory);
+	    HashInsertArgs in_args = {.key = pid_key, .data = free_space, .ht = table_page_dir->page_directory };
+	    hash_insert(&in_args);
         }
 
         head = table_page_dir;
@@ -66,8 +67,6 @@ static TablePageDirectory *page_directory_manager_instance() {
 }
 
 Header extract_header(uint8_t *page, page_id_t page_id) {
-    RWLOCK latch;
-    RWLOCK_INIT(&latch);
     uint16_t free_start = decode_uint16(page);
     uint16_t free_end = decode_uint16(page + sizeof(uint16_t));
     uint16_t free_total = free_end - free_start;
@@ -75,8 +74,7 @@ Header extract_header(uint8_t *page, page_id_t page_id) {
                      .free_start = free_start,
                      .free_end = free_end,
                      .free_total = free_total,
-                     .flags = *(page + (sizeof(uint16_t) * 2)),
-                     .latch = latch};
+                     .flags = *(page + (sizeof(uint16_t) * 2))};
 
     return header;
 }
@@ -88,7 +86,7 @@ TuplePtr extract_tuple_ptr(uint8_t *page, uint32_t slot_num) {
     memcpy(tuple_ptr_buf, page + TUPLE_INDEX_TO_TUPLE_POINTER_OFFSET(slot_num), sizeof(uint16_t));
     data.start_offset = decode_uint16(tuple_ptr_buf);
     data.size = decode_uint16(tuple_ptr_buf + sizeof(uint16_t));
-    
+
     return data;
 }
 
@@ -150,7 +148,7 @@ void create_table(const char *table_name, Column *columns, uint8_t n_columns) {
     write(fd, col_buf, PAGE_SIZE);
 
     // Add table to page directory manager
-    TablePageDirectory *new_page_dir = (TablePageDirectory *)malloc(sizeof(TablePageDirectory));
+    PageDirectory *new_page_dir = (PageDirectory *)malloc(sizeof(PageDirectory));
     strcpy(new_page_dir->table_name, table_name);
     new_page_dir->page_directory = init_hash(MAX_PAGES);
 
@@ -160,7 +158,8 @@ void create_table(const char *table_name, Column *columns, uint8_t n_columns) {
 
         uint16_t *free_space = (uint16_t *)malloc(sizeof(size_t));
         *free_space = PAGE_SIZE;
-        hash_insert(pid_key, free_space, new_page_dir->page_directory);
+	HashInsertArgs in_args = {.key = pid_key, .data = free_space, .ht = new_page_dir->page_directory };
+        hash_insert(&in_args);
     }
 
     new_page_dir->next = page_directory_manager_instance();
@@ -180,7 +179,7 @@ void remove_table(const char *table_name) {
  * Returns true if found, false otherwise.
  * Found page_id is stored in the provided out param
  */
-static bool find_spacious_page(uint16_t size_needed, TablePageDirectory *table_page_dir, page_id_t *page_id) {
+static bool find_spacious_page(uint16_t size_needed, PageDirectory *table_page_dir, page_id_t *page_id) {
     for (page_id_t i = START_USER_PAGE; i < MAX_PAGES; i++) {
         char pid_key[11];
         sprintf(pid_key, "%d", i);
@@ -194,8 +193,8 @@ static bool find_spacious_page(uint16_t size_needed, TablePageDirectory *table_p
 }
 
 // returns table's page directory or NULL if couldn't find it
-static TablePageDirectory *find_page_dir(const char *table_name) {
-    TablePageDirectory *curr = page_directory_manager_instance();
+static PageDirectory *find_page_dir(const char *table_name) {
+    PageDirectory *curr = page_directory_manager_instance();
     while (strcmp(curr->table_name, table_name) != 0) {
         curr = curr->next;
         if (!curr)
@@ -224,14 +223,17 @@ page_id_t new_page(const char *table_name) {
 static void update_page_dir(const char *table_name, page_id_t pid, uint16_t tuple_size, enum TupleAction act) {
     char *pid_key = (char *)malloc(sizeof(char) * 11);
     sprintf(pid_key, "%u", pid);
+    PageDirectory *page_dir = find_page_dir(table_name);
+    if (page_dir == NULL) return;
 
-    TablePageDirectory *page_dir = find_page_dir(table_name);
     // TODO: make find->remove->insert a single procedure
     uint16_t curr_free_space = *(uint16_t *)hash_find(pid_key, page_dir->page_directory)->data;
-    hash_remove(pid_key, page_dir->page_directory);
+    HashRemoveArgs rm_args = {.key = pid_key, .ht = page_dir->page_directory};
+    hash_remove(&rm_args);
     uint16_t *free_space = (uint16_t *)malloc(sizeof(uint16_t));
     *free_space = act == TUPLE_ADD ? curr_free_space - tuple_size : curr_free_space + tuple_size;
-    hash_insert(pid_key, free_space, page_dir->page_directory);
+    HashInsertArgs in_args = {.key = pid_key, .data = free_space, .ht = page_dir->page_directory };
+    hash_insert(&in_args);
 
     int fd = table_file(table_name);
     uint8_t pid_buf[4], free_space_buf[4], total_buf[4];
@@ -242,7 +244,7 @@ static void update_page_dir(const char *table_name, page_id_t pid, uint16_t tupl
     pwrite(fd, total_buf, 4, PID_TO_PAGE_DIRECTORY_OFFSET(pid));
 }
 
-TuplePtr *add_tuple(void *data_args) {
+void add_tuple(void *data_args) {
     AddTupleArgs *data = (AddTupleArgs *)data_args;
 
     // TODO: get tuple length and create tuple buffer in one pass
@@ -292,11 +294,10 @@ TuplePtr *add_tuple(void *data_args) {
     find_spacious_page(tuple_size, find_page_dir(data->table_name), pid);
     if (!pid) {
         printf("Couldn't find available page"); // this can be solved with overflow pages
-        return NULL;
+        return;
     }
     uint8_t *page = read_page(*pid, data->table_name);
     Header header = extract_header(page, *pid);
-    RWLOCK_WRLOCK(&header.latch);
 
     // Extract schema info
     uint8_t *schema = read_page(1, data->table_name);
@@ -322,27 +323,26 @@ TuplePtr *add_tuple(void *data_args) {
         // Validate columns
         if (data->num_columns != cols_num) {
             fprintf(stderr, "Provided number of columns does not match the schema\n");
-            return NULL;
+            return;
         }
-        if (strcmp(col_name_buf, data->column_names[i]) != 0) {
-            fprintf(stderr, "Provided column name '%s' does not match with its schema counterpart '%s'\n",
+        if (strncmp(col_name_buf, data->column_names[i], col_name_len) != 0) {
+            fprintf(stderr, "Provided column name '%s' does not match its schema counterpart '%s'\n",
                     data->column_names[i], col_name_buf);
-            return NULL;
+            return;
         }
         if (data->column_types[i] != *data_type_buf) {
             fprintf(stderr, "Provided type '%d' does not match its schema counterpart '%d'", data->column_types[i],
                     *data_type_buf);
-            return NULL;
+            return;
         }
     }
 
     // Write the tuple out
-    TuplePtr *tuple_ptr = (TuplePtr *)malloc(sizeof(TuplePtr));
-    tuple_ptr->size = tuple_size;
-    tuple_ptr->start_offset = header.free_end - tuple_size;
+    uint16_t start_off = header.free_end - tuple_size;
+    TuplePtr tuple_ptr = {.start_offset = start_off, .size = tuple_size};
     uint8_t tuple_ptr_buf[TUPLE_PTR_SIZE];
-    encode_uint16(tuple_ptr->start_offset, tuple_ptr_buf);
-    encode_uint16(tuple_ptr->size, tuple_ptr_buf + sizeof(uint16_t));
+    encode_uint16(tuple_ptr.start_offset, tuple_ptr_buf);
+    encode_uint16(tuple_ptr.size, tuple_ptr_buf + sizeof(uint16_t));
     memcpy(page + header.free_start, tuple_ptr_buf, TUPLE_PTR_SIZE);
 
     memcpy(page + header.free_end - tuple_size, tuple_buf, tuple_size);
@@ -355,9 +355,9 @@ TuplePtr *add_tuple(void *data_args) {
     write_page(*pid, data->table_name, page);
     update_page_dir(data->table_name, *pid, tuple_size, TUPLE_ADD);
 
+    data->tup_ptr_out->size = tuple_ptr.size;
+    data->tup_ptr_out->start_offset = tuple_ptr.start_offset;
     free(pid);
-    RWLOCK_UNLOCK(&header.latch);
-    return tuple_ptr;
 }
 
 // void remove_tuple(void *page, uint16_t tuple_idx) {

@@ -22,6 +22,7 @@ static const char add_tab2[15] = "test_table2";
 static const char add_tab3[15] = "test_table3";
 static const char add_page_tab[15] = "add_page_test";
 static const char add_tuple_tab[25] = "add_tuple_to_page_test";
+TuplePtr *t_ptr1, *t_ptr2;
 
 void add_table_teardown(void) {
     remove_table(add_tab1);
@@ -31,7 +32,11 @@ void add_table_teardown(void) {
 
 void add_page_teardown(void) { remove_table(add_page_tab); }
 
-void add_tuple_teardown(void) { remove_table(add_tuple_tab); }
+void add_tuple_teardown(void) { 
+    remove_table(add_tuple_tab); 
+    free(t_ptr1);
+    free(t_ptr2);
+}
 
 START_TEST(add_table) {
     char col_n[4] = "ads";
@@ -112,24 +117,26 @@ START_TEST(add_tuple_to_page) {
     ColumnValue col_vals[2] = {{.string_value = "Pero"}, {.uint32_value = 21}};
     int name_len = strlen("Pero");
 
+    t_ptr1 = (TuplePtr *)malloc(sizeof(TuplePtr));
+    t_ptr2 = (TuplePtr *)malloc(sizeof(TuplePtr));
+
     AddTupleArgs t_args1 = {.table_name = add_tuple_tab,
                             .column_names = col_names,
                             .column_values = col_vals,
                             .column_types = col_types,
-                            .num_columns = 2};
+                            .num_columns = 2,
+			    .tup_ptr_out = t_ptr1};
     AddTupleArgs t_args2 = {.table_name = add_tuple_tab,
                             .column_names = col_names2,
                             .column_values = col_vals,
                             .column_types = col_types,
-                            .num_columns = 2};
-    TuplePtr *t_ptr1 = add_tuple(&t_args1);
-    TuplePtr *t_ptr2 = add_tuple(&t_args2);
-    ck_assert_ptr_nonnull(t_ptr1);
-    ck_assert_ptr_null(t_ptr2);
-    //    pthread_create(&t1, NULL, (void *(*)(void *))add_tuple, &t_args1);
-    //    pthread_create(&t2, NULL, (void *(*)(void *))add_tuple, &t_args2);
-    //    pthread_join(t1, NULL);
-    //    pthread_join(t2, NULL);
+                            .num_columns = 2,
+			    .tup_ptr_out = t_ptr2};
+
+    pthread_create(&t1, NULL, (void *(*)(void *))add_tuple, &t_args1);
+    pthread_create(&t2, NULL, (void *(*)(void *))add_tuple, &t_args2);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
 
     uint8_t *page = read_page(pid, add_tuple_tab);
     Header header = extract_header(page, pid);
@@ -146,13 +153,9 @@ START_TEST(add_tuple_to_page) {
     memcpy(read_buf, page + t_ptr1->start_offset, t_ptr1->size); // new tuple's "name" string length
     ck_assert_uint_eq(decode_uint16(read_buf), name_len);
     memcpy(read_buf, page + t_ptr1->start_offset + sizeof(uint16_t), name_len); // new tuple's "name" value
-    // read_buf is larger than "name" value, and name is stored as Pascal string, so we insert null terminator at the end
-    read_buf[name_len] = '\0'; 
-    ck_assert_str_eq((char *)read_buf, "Pero");
-    memcpy(read_buf, 
-	    page + t_ptr1->start_offset + name_len + sizeof(uint16_t),
-	    sizeof(uint16_t)
-	  ); // new tuple's "age" value
+    ck_assert_int_eq(strncmp((char*)read_buf, "Pero", name_len), 0);
+    memcpy(read_buf, page + t_ptr1->start_offset + name_len + sizeof(uint16_t),
+           sizeof(uint16_t)); // new tuple's "age" value
     ck_assert_uint_eq(decode_uint16(read_buf), 21);
 
     // assert correctness of tuple retreival from disk
@@ -162,7 +165,7 @@ START_TEST(add_tuple_to_page) {
     memcpy(tuple_data_buf, tuple_data, sizeof(uint16_t)); // tuple's "name" string length
     ck_assert_uint_eq(decode_uint16(tuple_data_buf), name_len);
     memcpy(tuple_data_buf, tuple_data + sizeof(uint16_t), name_len); // tuple's "name" value
-    ck_assert_str_eq((char*)tuple_data_buf, "Pero");
+    ck_assert_int_eq(strncmp((char *)tuple_data_buf, "Pero", name_len), 0);
 }
 
 END_TEST
@@ -195,6 +198,7 @@ END_TEST
 //
 // END_TEST
 //
+
 Suite *page_suite(void) {
     Suite *s;
     TCase *tc_core;

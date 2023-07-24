@@ -31,7 +31,8 @@ static void add_to_pagetable(page_id_t key, frame_id_t *val, BufferPoolManager *
     char *key_str = (char *)malloc(sizeof(char) * 5);
     sprintf(key_str, "%u", key);
 
-    hash_insert(key_str, val, bpm->page_table);
+    HashInsertArgs in_args = {.key = key_str, .data = val, .ht = bpm->page_table};
+    hash_insert(&in_args);
 }
 
 BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
@@ -60,7 +61,6 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
         return NULL;
 
     BpmPage page = {.id = *fid, .data = NULL, .pin_count = 1, .is_dirty = false};
-    memcpy(page.data, read_page(pid), PAGE_SIZE);
     bpm->pages[*fid] = page;
 
     add_to_pagetable(pid, fid, bpm);

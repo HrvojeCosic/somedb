@@ -9,6 +9,7 @@
 static HashTable *ht;
 static char *key1, *key2, *key3;
 static page_id_t *val1, *val2, *val3;
+static pthread_t t1, t2, t3;
 
 START_TEST(initialize) {
     uint8_t hsize = 5;
@@ -34,9 +35,15 @@ START_TEST(insert_find) {
     strncpy(key1, "1", 2);
     strncpy(key2, "2", 2);
     strncpy(key3, "11", 3); // collision
-    hash_insert(key1, val1, ht);
-    hash_insert(key2, val2, ht);
-    hash_insert(key3, val3, ht);
+    HashInsertArgs in_args1 = {.key = key1, .data = val1, .ht = ht};
+    HashInsertArgs in_args2 = {.key = key2, .data = val2, .ht = ht};
+    HashInsertArgs in_args3 = {.key = key3, .data = val3, .ht = ht};
+    pthread_create(&t1, NULL, (void *(*)(void *))hash_insert, &in_args1);
+    pthread_create(&t2, NULL, (void *(*)(void *))hash_insert, &in_args2);
+    pthread_create(&t3, NULL, (void *(*)(void *))hash_insert, &in_args3);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    pthread_join(t3, NULL);
     HashEl *found1 = hash_find(key1, ht);
     HashEl *found2 = hash_find(key2, ht);
     HashEl *found3 = hash_find(key3, ht);
@@ -58,7 +65,8 @@ START_TEST(insert_find) {
     strncpy(key2_overwrite, "2", 2);
     page_id_t *val2_overwrite = (page_id_t *)malloc(sizeof(page_id_t));
     *val2_overwrite = 33;
-    hash_insert(key2_overwrite, val2_overwrite, ht);
+    HashInsertArgs in_args = {.key = key2_overwrite, .data = val2_overwrite, .ht = ht};
+    hash_insert(&in_args);
     HashEl *overwritten = hash_find(key2, ht);
     ck_assert_ptr_null(overwritten->next); // still only key "2" in that bucket
     ck_assert_str_eq(overwritten->key, key2_overwrite);
@@ -66,15 +74,24 @@ START_TEST(insert_find) {
 }
 
 START_TEST(remove_entry) {
-    hash_remove(key2, ht); // Remove sole element in a bucket
+    HashRemoveArgs rm_args = {.key = key2, .ht = ht};
+    pthread_create(&t1, NULL, (void *(*)(void *))hash_remove, &rm_args);
+    pthread_create(&t2, NULL, (void *(*)(void *))hash_remove, &rm_args); //remove sole bucket el.
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+
     ck_assert_ptr_null(hash_find(key2, ht));
-    hash_insert(key3, val3, ht);
-    hash_remove(key3, ht); // Remove first element in a multiple-element bucket
+    HashInsertArgs in_args = {.key = key3, .data = val3, .ht = ht};
+    hash_insert(&in_args);
+    HashRemoveArgs rm_args2 = {.key = key3, .ht = ht};
+    hash_remove(&rm_args2); // Remove first element in a multiple-element bucket
     page_id_t *val3_second = (page_id_t *)malloc(sizeof(page_id_t));
     *val3_second = 32;
     char *key3_second = (char *)malloc(sizeof(char) * 3);
-    hash_insert(key3_second, val3_second, ht);
-    hash_remove(key1, ht);
+    HashInsertArgs in_args2 = {.key = key3_second, .data = val3_second, .ht = ht};
+    hash_insert(&in_args2);
+    HashRemoveArgs rm_args3 = {.key = key1, .ht = ht};
+    hash_remove(&rm_args3);
 }
 
 Suite *page_suite(void) {

@@ -8,9 +8,12 @@
 #include <string.h>
 
 HashTable *init_hash(uint32_t size) {
+    RWLOCK latch;
+    RWLOCK_INIT(&latch);
     HashTable *ht = (HashTable *)malloc(sizeof(HashTable));
     ht->size = size;
     ht->arr = (HashEl *)calloc(sizeof(HashEl), size);
+    ht->latch = latch;
     return ht;
 }
 
@@ -27,6 +30,7 @@ void destroy_hash(HashTable **ht) {
     if (ht == NULL || *ht == NULL)
         return;
 
+    RWLOCK_WRLOCK(&(*ht)->latch);
     for (uint16_t i = 0; i < (*ht)->size; i++) {
         HashEl *curr = (*ht)->arr + i;
         HashEl *temp = NULL;
@@ -39,6 +43,7 @@ void destroy_hash(HashTable **ht) {
     }
     free((*ht)->arr);
     (*ht)->arr = NULL;
+    RWLOCK_UNLOCK(&(*ht)->latch);
     free(*ht);
     *ht = NULL;
 }
@@ -49,10 +54,17 @@ void destroy_hash(HashTable **ht) {
  */
 static uint16_t hash(const char *key, HashTable *ht) { return atoi(key) % ht->size; }
 
-void hash_insert(const char *key, void *data, HashTable *ht) {
+void hash_insert(void *hash_insert_args) {
+    HashInsertArgs *args = (HashInsertArgs *)hash_insert_args;
+    const char *key = args->key;
+    HashTable *ht = args->ht;
+    void *data = args->data;
+    
+
     if (key == NULL || data == NULL)
         return;
 
+    RWLOCK_WRLOCK(&ht->latch);
     uint16_t idx = hash(key, ht);
 
     HashEl *el = (HashEl *)malloc(sizeof(HashEl));
@@ -79,9 +91,15 @@ void hash_insert(const char *key, void *data, HashTable *ht) {
         if (!overwrite)
             prev->next = el;
     }
+    RWLOCK_UNLOCK(&ht->latch);
 }
 
-bool hash_remove(const char *key, HashTable *ht) {
+void hash_remove(void *hash_remove_args) {
+    HashRemoveArgs *args = (HashRemoveArgs *)hash_remove_args;
+    HashTable *ht = args->ht;
+    const char *key = args->key;
+
+    RWLOCK_WRLOCK(&ht->latch);
     uint16_t idx = hash(key, ht);
     HashEl *temp = ht->arr + idx;
     HashEl *prev = NULL;
@@ -91,8 +109,11 @@ bool hash_remove(const char *key, HashTable *ht) {
         temp = temp->next;
     }
 
-    if (temp == NULL)
-        return false;
+    if (temp == NULL) {
+	RWLOCK_UNLOCK(&ht->latch);
+	if(args->success_out) *args->success_out = false;
+	return;
+    }
 
     if (prev == NULL) {           // if its first el. in LL
         if (temp->next == NULL) { // if its the only el. in LL
@@ -107,7 +128,9 @@ bool hash_remove(const char *key, HashTable *ht) {
         prev->next = temp->next;
         free_hash_el(&temp);
     }
-    return true;
+    if(args->success_out) *args->success_out = true;
+    RWLOCK_UNLOCK(&ht->latch);
+    return;
 }
 
 HashEl *hash_find(const char *key, HashTable *ht) {
