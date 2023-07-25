@@ -20,9 +20,10 @@
  */
 #define START_COLUMNS_INFO 1
 
-#define PAGE_NO_HEADER(page) page + sizeof(Header) // Pointer to the page memory after it's header
+#define TUPLE_POINTER_OFFSET_TO_TUPLE_INDEX(offset) (offset - PAGE_HEADER_SIZE) / TUPLE_PTR_SIZE
 #define TUPLE_INDEX_TO_TUPLE_POINTER_OFFSET(idx) PAGE_HEADER_SIZE + (idx * TUPLE_PTR_SIZE)
-#define PAGE_HEADER(page) (Header *)page // Pointer to the start of page header
+#define PAGE_NO_HEADER(page) page + sizeof(Header) // Pointer to the page memory after it's header
+#define PAGE_HEADER(page) (Header *)page           // Pointer to the start of page header
 #define PID_TO_PAGE_DIRECTORY_OFFSET(pid) pid * 2
 #define SCHEMA_COLUMN_SIZE(col_name_len)                                                                               \
     (1 + col_name_len + 1) // column_name_length + column_name_string + column_data_type
@@ -31,17 +32,10 @@
 #define COMPACTABLE (1 << 7)
 
 typedef struct {
-    HashTable *page_directory; // table's page directory in memory representation, for saving some file seeks
+    HashTable *page_directory; // table's page directory in memory representation, for saving some file seek expenses
     char *table_name;
     RWLOCK latch;
 } DiskManager;
-
-typedef struct {
-    uint16_t keys_start;   // offset to beginning of page_id array
-    uint16_t values_start; // offset to beginning of array of file offsets corresponding to each key
-    uint16_t
-        entry_num; // current number of entries in the page directory. Useful for knowing the length of keys/values arrs
-} PageDirectoryHeader;
 
 typedef struct {
     page_id_t id;
@@ -49,7 +43,6 @@ typedef struct {
     uint16_t free_end;   // offset to end of available page memory
     uint16_t free_total; // total available page memory
     uint8_t flags;
-    RWLOCK latch;
 } Header;
 
 typedef struct {
@@ -108,7 +101,7 @@ int table_file(const char *table_name);
  *  -8 bit unsigned integer containing special page header flags
  * 2.Tuple pointer list consisting of 32 bit pairs (2x16) of the following layout:
  *  -16 bit unsigned integer representing the page offset to the corresponding tuple
- *  -16 bit unsigned integer representing the tuple length
+ *  -16 bit unsigned integer representing the tuple size
  * 3.Tuple list containing stored data
  * All data is serialized as described in serialize.h
  */
@@ -129,16 +122,18 @@ Header extract_header(uint8_t *page, page_id_t page_id);
 uint8_t *get_tuple(RID rid, DiskManager *disk_manager);
 
 /*
- * Removes tuple of the specified page at the specified index
+ * Marks tuple of the table find in disk_manager of the specified record id as removed.
+ * This operation doesn't actually remove the data from disk, but makes the slot available for removal during
+ * defragmentation of the page
  */
-void remove_tuple(void *page, uint16_t tuple_idx);
+void remove_tuple(DiskManager *disk_manager, RID rid);
 
 /*
- * Defragments the page by freeing up the memory of removed tuple components.
+ * Defragments the page by removing contents of the tuples marked as removed
  * Unsets the COMPACTABLE flag in the header afterwards.
- * Does nothing if the page is not compactable
+ * Does nothing if the page is not compactable (no tuples have been marked as removed)
  */
-void defragment(void *page);
+void defragment(page_id_t page_id, DiskManager *disk_manager);
 
 /*
  * Writes raw DATA to the offset of PAGE_ID to a database table file of DISK_MANAGER's table
@@ -166,12 +161,6 @@ typedef struct {
     uint8_t num_columns;
     TuplePtr *tup_ptr_out;
 } AddTupleArgs;
-
-/*
- * Returns information about tuple pointers at the specified page contained in
- * TuplePtrList
- */
-TuplePtrList get_tuple_ptr_list(void *page);
 
 /*
  * Currently only used for testing. It just removes the database file of the particular table

@@ -14,13 +14,13 @@ typedef struct {
     char y[30];
 } TupleExample;
 
-static pthread_t t1, t2;
+static pthread_t t1, t2, t3;
 static const char add_tab1[15] = "test_table1";
 static const char add_tab2[15] = "test_table2";
 static const char add_tab3[15] = "test_table3";
 static const char add_page_tab[15] = "add_page_test";
 static const char add_tuple_tab[25] = "add_tuple_to_page_test";
-static TuplePtr *t_ptr1, *t_ptr2;
+static TuplePtr *t_ptr1, *t_ptr2, *t_ptr3;
 
 void add_table_teardown(void) {
     remove_table(add_tab1);
@@ -106,6 +106,7 @@ START_TEST(add_tuple_to_page) {
     char cname2[5] = "age";
     Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = STRING},
                       {.name_len = (uint8_t)strlen(cname2), .name = cname2, .type = UINT16}};
+    const char add_tuple_tab[25] = "add_tuple_to_page_test";
     DiskManager *disk_mgr = create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
     page_id_t pid = new_page(disk_mgr);
 
@@ -148,6 +149,10 @@ START_TEST(add_tuple_to_page) {
     memcpy(read_buf, (page + header.free_start - TUPLE_PTR_SIZE),
            TUPLE_PTR_SIZE); // "tuple start offset" of new tuple pointer
     ck_assert_uint_eq(decode_uint16(read_buf), PAGE_SIZE - 1 - t_ptr1->size);
+    memcpy(read_buf, (page + header.free_start - TUPLE_PTR_SIZE + sizeof(uint16_t)),
+           TUPLE_PTR_SIZE); // "tuple size" of new tuple pointer
+    ck_assert_uint_eq(decode_uint16(read_buf), t_ptr1->size);
+    ck_assert_uint_ne(decode_uint16(read_buf), 0);
     memcpy(read_buf, page + t_ptr1->start_offset, t_ptr1->size); // new tuple's "name" string length
     ck_assert_uint_eq(decode_uint16(read_buf), name_len);
     memcpy(read_buf, page + t_ptr1->start_offset + sizeof(uint16_t), name_len); // new tuple's "name" value
@@ -168,36 +173,111 @@ START_TEST(add_tuple_to_page) {
 
 END_TEST
 
-// START_TEST(remove_tuple_from_page) {
-//     remove_tuple(page, tid);
-//     ck_assert_ptr_null(get_tuple(pid, tid, disk_manager));
-//     ck_assert_int_eq(header->flags, COMPACTABLE);
-//     ck_assert_int_eq(get_tuple_ptr_list(page).length, 2);
-//}
+START_TEST(remove_tuple_and_defragment) {
+    // -----------------------------------------------------------------------------------------------------
+    // REMOVE
+    // -----------------------------------------------------------------------------------------------------
+    char cname1[5] = "name";
+    char cname2[5] = "age";
+    Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = STRING},
+                      {.name_len = (uint8_t)strlen(cname2), .name = cname2, .type = UINT16}};
+    DiskManager *disk_mgr = create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
+    page_id_t pid = new_page(disk_mgr);
+
+    const char *col_names[2] = {"name", "age"};
+    ColumnType col_types[2] = {STRING, UINT16};
+    ColumnValue col_vals1[2] = {{.string_value = "Marica"}, {.uint32_value = 21}};
+    ColumnValue col_vals2[2] = {{.string_value = "Perica"}, {.uint32_value = 31}};
+    ColumnValue col_vals3[2] = {{.string_value = "Nikolina"}, {.uint32_value = 41}};
+    // Perica and Marica are of same length for defragment testing convenience (that while loop)
+    uint16_t name_len1 = strlen("Marica");
+    uint16_t name_len2 = strlen("Perica");
+    uint16_t name_len3 = strlen("Nikolina");
+    t_ptr1 = (TuplePtr *)malloc(sizeof(TuplePtr));
+    t_ptr2 = (TuplePtr *)malloc(sizeof(TuplePtr));
+    t_ptr3 = (TuplePtr *)malloc(sizeof(TuplePtr));
+    AddTupleArgs t_args1 = {.disk_manager = disk_mgr,
+                            .column_names = col_names,
+                            .column_values = col_vals1,
+                            .column_types = col_types,
+                            .num_columns = 2,
+                            .tup_ptr_out = t_ptr1};
+    AddTupleArgs t_args2 = {.disk_manager = disk_mgr,
+                            .column_names = col_names,
+                            .column_values = col_vals2,
+                            .column_types = col_types,
+                            .num_columns = 2,
+                            .tup_ptr_out = t_ptr2};
+    AddTupleArgs t_args3 = {.disk_manager = disk_mgr,
+                            .column_names = col_names,
+                            .column_values = col_vals3,
+                            .column_types = col_types,
+                            .num_columns = 2,
+                            .tup_ptr_out = t_ptr3};
+    add_tuple(&t_args1);
+    add_tuple(&t_args2);
+    add_tuple(&t_args3);
+    // Slot numbers are just initialized in a way that tuple pointers are currently being inserted in a page on disk,
+    // but in the future there should probably be some function that gives this information instead
+    RID rid1 = {.pid = pid, .slot_num = 0};
+    RID rid2 = {.pid = pid, .slot_num = 1};
+    RID rid3 = {.pid = pid, .slot_num = 2};
+
+    uint8_t *page_before = read_page(pid, disk_mgr);
+    Header header_before = extract_header(page_before, pid);
+    uint8_t read_buf[t_ptr1->size + t_ptr2->size]; // a bit of extra space
+    memcpy(read_buf, (page_before + header_before.free_start - TUPLE_PTR_SIZE),
+           TUPLE_PTR_SIZE); // last added tuple's "start offset"
+    ck_assert_uint_eq(decode_uint16(read_buf),
+                      PAGE_SIZE - 1 - t_ptr3->size - t_ptr2->size - t_ptr1->size); // is not 0 before
+    memcpy(read_buf, page_before + t_ptr1->start_offset + name_len1 + sizeof(uint16_t),
+           sizeof(uint16_t)); // "age" value
+    ck_assert_uint_eq(decode_uint16(read_buf), 21);
+
+    remove_tuple(disk_mgr, rid3);
+
+    uint8_t *page_after_remove = read_page(pid, disk_mgr);
+    Header header_after_remove = extract_header(page_after_remove, pid);
+    memcpy(read_buf, (page_after_remove + header_after_remove.free_start - TUPLE_PTR_SIZE),
+           TUPLE_PTR_SIZE);                        // last added tuple's "start offset"
+    ck_assert_uint_eq(decode_uint16(read_buf), 0); // should be 0, which means marked as removed
+    memcpy(read_buf, page_before + t_ptr1->start_offset + name_len1 + sizeof(uint16_t),
+           sizeof(uint16_t));                       // "age" value
+    ck_assert_uint_eq(decode_uint16(read_buf), 21); // should remain same as before
+    ck_assert_uint_eq(header_after_remove.flags, header_before.flags | COMPACTABLE);
+
+    // -----------------------------------------------------------------------------------------------------
+    // DEFRAGMENT
+    // -----------------------------------------------------------------------------------------------------
+    defragment(pid, disk_mgr);
+    uint8_t *page_after_defrag = read_page(pid, disk_mgr);
+    Header header_after_defrag = extract_header(page_after_defrag, pid);
+
+    uint16_t curr_offset = PAGE_HEADER_SIZE;
+    while (curr_offset < header_after_defrag.free_start) {
+        memcpy(read_buf, (page_after_defrag + curr_offset), TUPLE_PTR_SIZE); // tuple's ptr
+        uint16_t tup_off = decode_uint16(read_buf);
+        uint16_t tup_size = decode_uint16(read_buf + sizeof(uint16_t));
+        memcpy(read_buf, page_after_defrag + decode_uint16(read_buf), tup_size); // tuple content
+
+        // assert tuple is of any content of added tuples other than that of the removed tuple's
+        ck_assert(decode_uint16(read_buf) == name_len1 || decode_uint16(read_buf) == name_len2);
+        memcpy(read_buf, page_after_defrag + tup_off + sizeof(uint16_t), name_len1); // "name" value
+        ck_assert(strncmp((char *)read_buf, "Marica", name_len1) == 0 ||
+                  strncmp((char *)read_buf, "Perica", name_len1) == 0);
+        memcpy(read_buf, page_after_defrag + tup_off + 2 + name_len1, 2); // "age" value
+        ck_assert(decode_uint16(read_buf) == 21 || decode_uint16(read_buf) == 31);
+
+        curr_offset += TUPLE_PTR_SIZE;
+    }
+    ck_assert_uint_eq(header_after_defrag.flags, header_after_remove.flags & ~COMPACTABLE);
+    ck_assert_uint_ne(decode_uint16(read_buf), 0); // should not be 0, which means tuple's not marked as removed
+}
 
 END_TEST
 
-//
-// START_TEST(defragment_and_disk_persistance) {
-//    uint16_t total_before = header->free_total;
-//    defragment(page, disk_manager);
-//    TupleExample *removed = (TupleExample *)get_tuple(pid, 1, disk_manager);
-//    ck_assert_ptr_null(removed);
-//    ck_assert_int_eq(header->free_total, total_before + sizeof(TupleExample) + sizeof(TuplePtr));
-//    ck_assert_int_eq(get_tuple_ptr_list(page).length, 1);
-//
-//    write_page(pid, page, disk_manager);
-//    void *r_page = read_page(pid, disk_manager);
-//    TupleExample *r_tuple = (TupleExample *)get_tuple(pid, 0, disk_manager);
-//    ck_assert_str_eq(r_tuple->y, "str1");
-//    ck_assert_int_eq(r_tuple->x, 1);
-//}
-//
-// END_TEST
-//
-
 // for some reason there is a segfault in srunner_run_all() when running with tsan if this doesnt exist??
-START_TEST(x) {}
+START_TEST(x) { return; }
 
 END_TEST
 
@@ -213,8 +293,7 @@ Suite *page_suite(void) {
     tcase_add_test(tc_core, add_table);
     tcase_add_test(tc_core, add_page);
     tcase_add_test(tc_core, add_tuple_to_page);
-    // tcase_add_test(tc_core, remove_tuple_from_page);
-    // tcase_add_test(tc_core, defragment_and_disk_persistance);
+    tcase_add_test(tc_core, remove_tuple_and_defragment);
 
     tcase_add_checked_fixture(tc_core, NULL, add_table_teardown);
     tcase_add_checked_fixture(tc_core, NULL, add_page_teardown);
