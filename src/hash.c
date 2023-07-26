@@ -54,14 +54,14 @@ void destroy_hash(HashTable **ht) {
  */
 static uint16_t hash(const char *key, HashTable *ht) { return atoi(key) % ht->size; }
 
-void hash_insert(void *hash_insert_args) {
+void *hash_insert(void *hash_insert_args) {
     HashInsertArgs *args = (HashInsertArgs *)hash_insert_args;
     const char *key = args->key;
     HashTable *ht = args->ht;
     void *data = args->data;
 
     if (key == NULL || data == NULL)
-        return;
+        return NULL;
 
     RWLOCK_WRLOCK(&ht->latch);
     uint16_t idx = hash(key, ht);
@@ -91,9 +91,10 @@ void hash_insert(void *hash_insert_args) {
             prev->next = el;
     }
     RWLOCK_UNLOCK(&ht->latch);
+    return NULL;
 }
 
-void hash_remove(void *hash_remove_args) {
+void *hash_remove(void *hash_remove_args) {
     HashRemoveArgs *args = (HashRemoveArgs *)hash_remove_args;
     HashTable *ht = args->ht;
     const char *key = args->key;
@@ -112,7 +113,7 @@ void hash_remove(void *hash_remove_args) {
         RWLOCK_UNLOCK(&ht->latch);
         if (args->success_out)
             *args->success_out = false;
-        return;
+        return NULL;
     }
 
     if (prev == NULL) {           // if its first el. in LL
@@ -131,7 +132,7 @@ void hash_remove(void *hash_remove_args) {
     if (args->success_out)
         *args->success_out = true;
     RWLOCK_UNLOCK(&ht->latch);
-    return;
+    return NULL;
 }
 
 HashEl *hash_find(const char *key, HashTable *ht) {

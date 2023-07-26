@@ -18,12 +18,8 @@ void close_table_file(DiskManager *disk_manager) { close(table_file(disk_manager
 Header extract_header(uint8_t *page, page_id_t page_id) {
     uint16_t free_start = decode_uint16(page);
     uint16_t free_end = decode_uint16(page + sizeof(uint16_t));
-    uint16_t free_total = free_end - free_start;
-    Header header = {.id = page_id,
-                     .free_start = free_start,
-                     .free_end = free_end,
-                     .free_total = free_total,
-                     .flags = *(page + (sizeof(uint16_t) * 2))};
+    Header header = {
+        .id = page_id, .free_start = free_start, .free_end = free_end, .flags = *(page + (sizeof(uint16_t) * 2))};
 
     return header;
 }
@@ -51,10 +47,10 @@ static void construct_page_tuple_ptr(uint8_t *page, uint32_t slot_num, TuplePtr 
 }
 
 int table_file(const char *table_name) {
-    DIR *dbfiles_dir = opendir(DBFILES_DIR);
+    opendir(DBFILES_DIR);
     if (ENOENT == errno) {
         mkdir(DBFILES_DIR, 0700);
-        dbfiles_dir = opendir(DBFILES_DIR);
+        opendir(DBFILES_DIR);
     }
 
     char path[40];
@@ -126,7 +122,7 @@ DiskManager *create_table(const char *table_name, Column *columns, uint8_t n_col
 void remove_table(const char *table_name) {
     char path[40];
     sprintf(path, "%s/%s.db", DBFILES_DIR, table_name);
-    int r = remove(path);
+    remove(path);
 }
 
 /**
@@ -155,8 +151,7 @@ page_id_t new_page(DiskManager *disk_manager) {
 
     RWLOCK_WRLOCK(&disk_manager->latch);
     // Construct page header
-    Header header = {.free_start = PAGE_HEADER_SIZE, .free_end = PAGE_SIZE - 1, .flags = 0x00};
-    header.free_total = header.free_end - header.free_start;
+    Header header = {.id = pid, .free_start = PAGE_HEADER_SIZE, .free_end = PAGE_SIZE - 1, .flags = 0x00};
     construct_page_header_buf(page, header);
 
     write_page(pid, disk_manager, page);
@@ -172,7 +167,7 @@ static void update_page_dir(DiskManager *disk_manager, page_id_t pid, uint16_t t
 
     // TODO: make find->remove->insert a single procedure
     uint16_t curr_free_space = *(uint16_t *)hash_find(pid_key, disk_manager->page_directory)->data;
-    HashRemoveArgs rm_args = {.key = pid_key, .ht = disk_manager->page_directory};
+    HashRemoveArgs rm_args = {.key = pid_key, .ht = disk_manager->page_directory, .success_out = NULL};
     hash_remove(&rm_args);
     uint16_t *free_space = (uint16_t *)malloc(sizeof(uint16_t));
     *free_space = act == TUPLE_ADD ? curr_free_space - tuple_size : curr_free_space + tuple_size;
@@ -188,7 +183,7 @@ static void update_page_dir(DiskManager *disk_manager, page_id_t pid, uint16_t t
     pwrite(fd, total_buf, 4, PID_TO_PAGE_DIRECTORY_OFFSET(pid));
 }
 
-void add_tuple(void *data_args) {
+void *add_tuple(void *data_args) {
     AddTupleArgs *data = (AddTupleArgs *)data_args;
 
     // TODO: get tuple length and create tuple buffer in one pass
@@ -240,7 +235,7 @@ void add_tuple(void *data_args) {
     if (!pid) {
         printf("Couldn't find available page"); // this can be solved with overflow pages
         RWLOCK_UNLOCK(&data->disk_manager->latch);
-        return;
+        return NULL;
     }
     uint8_t *page = read_page(*pid, data->disk_manager);
     Header header = extract_header(page, *pid);
@@ -270,19 +265,19 @@ void add_tuple(void *data_args) {
         if (data->num_columns != cols_num) {
             fprintf(stderr, "Provided number of columns does not match the schema\n");
             RWLOCK_UNLOCK(&data->disk_manager->latch);
-            return;
+            return NULL;
         }
         if (strncmp(col_name_buf, data->column_names[i], col_name_len) != 0) {
             fprintf(stderr, "Provided column name '%s' does not match its schema counterpart '%s'\n",
                     data->column_names[i], col_name_buf);
             RWLOCK_UNLOCK(&data->disk_manager->latch);
-            return;
+            return NULL;
         }
         if (data->column_types[i] != *data_type_buf) {
             fprintf(stderr, "Provided type '%d' does not match its schema counterpart '%d'", data->column_types[i],
                     *data_type_buf);
             RWLOCK_UNLOCK(&data->disk_manager->latch);
-            return;
+            return NULL;
         }
     }
 
@@ -298,7 +293,6 @@ void add_tuple(void *data_args) {
 
     header.free_start += TUPLE_PTR_SIZE;
     header.free_end -= tuple_size;
-    header.free_total = header.free_end - header.free_start;
     construct_page_header_buf(page, header);
 
     write_page(*pid, data->disk_manager, page);
@@ -309,6 +303,7 @@ void add_tuple(void *data_args) {
 
     free(pid);
     RWLOCK_UNLOCK(&data->disk_manager->latch);
+    return NULL;
 }
 
 void remove_tuple(DiskManager *disk_manager, RID rid) {
@@ -346,7 +341,7 @@ void defragment(page_id_t page_id, DiskManager *disk_manager) {
         return;
 
     uint8_t *page = (uint8_t *)malloc(PAGE_SIZE);
-    Header header = {.id = page_id, .free_start = PAGE_HEADER_SIZE, .free_end = PAGE_SIZE - 1};
+    Header header = {.id = page_id, .free_start = PAGE_HEADER_SIZE, .free_end = PAGE_SIZE - 1, .flags = 0x00};
 
     uint8_t *temp = read_page(page_id, disk_manager);
     uint16_t temp_tuple_offset = old_header.free_end;
@@ -382,8 +377,6 @@ void defragment(page_id_t page_id, DiskManager *disk_manager) {
 void write_page(page_id_t page_id, DiskManager *disk_manager, void *data) {
     char pid_str[11];
     sprintf(pid_str, "%d", page_id);
-
-    Header *page_header = PAGE_HEADER(data);
 
     int fd = table_file(disk_manager->table_name);
     int l = lseek(fd, page_id * PAGE_SIZE, SEEK_SET);

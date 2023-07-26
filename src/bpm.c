@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-BufferPoolManager *new_bpm(const size_t pool_size) {
+BufferPoolManager *new_bpm(const size_t pool_size, DiskManager *disk_manager) {
     BpmPage *pages = (BpmPage *)calloc(sizeof(BpmPage), pool_size);
     bool *free_list = (bool *)malloc(sizeof(bool) * pool_size);
 
@@ -23,6 +23,7 @@ BufferPoolManager *new_bpm(const size_t pool_size) {
     bpm->free_list = free_list;
     bpm->page_table = init_hash(pool_size);
     bpm->replacer = *clock_replacer_init(pool_size);
+    bpm->disk_manager = disk_manager;
 
     return bpm;
 }
@@ -59,6 +60,8 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
         *fid = evict(&bpm->replacer);
     if (*fid == UINT32_MAX)
         return NULL;
+    else if (bpm->pages[*fid].is_dirty)
+        flush_page(*fid, bpm);
 
     BpmPage page = {.id = *fid, .data = NULL, .pin_count = 1, .is_dirty = false};
     bpm->pages[*fid] = page;
@@ -90,4 +93,43 @@ bool unpin_page(page_id_t page_id, bool is_dirty, BufferPoolManager *bpm) {
         clock_replacer_unpin((frame_id_t *)el->data, &bpm->replacer);
 
     return true;
+}
+
+bool flush_page(page_id_t page_id, BufferPoolManager *bpm) {
+    char pid_str[11];
+    sprintf(pid_str, "%d", page_id);
+    HashEl *entry = hash_find(pid_str, bpm->page_table);
+    if (!entry)
+        return false;
+    frame_id_t *fid = (frame_id_t *)entry->data;
+
+    write_page(page_id, bpm->disk_manager, bpm->pages[*fid].data);
+
+    HashRemoveArgs rm_args = {.key = pid_str, .ht = bpm->page_table, .success_out = NULL};
+    hash_remove(&rm_args);
+
+    bpm->free_list[*fid] = true;
+    clock_replacer_unpin(fid, &bpm->replacer);
+
+    return true;
+}
+
+BpmPage *fetch_bpm_page(page_id_t page_id, BufferPoolManager *bpm) {
+    char pid_str[11];
+    sprintf(pid_str, "%d", page_id);
+    HashEl *entry = hash_find(pid_str, bpm->page_table);
+    frame_id_t fid = 0;
+
+    if (entry) {
+        fid = *(frame_id_t *)entry->data;
+        bpm->pages[fid].pin_count++;
+        return bpm->pages + fid;
+    }
+
+    if (BpmPage *bpm_page = new_bpm_page(bpm, page_id)) {
+        bpm->pages[fid].pin_count++;
+        return bpm_page;
+    } else {
+        return NULL;
+    }
 }

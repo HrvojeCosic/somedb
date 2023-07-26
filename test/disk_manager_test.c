@@ -14,7 +14,7 @@ typedef struct {
     char y[30];
 } TupleExample;
 
-static pthread_t t1, t2, t3;
+static pthread_t t1, t2;
 static const char add_tab1[15] = "test_table1";
 static const char add_tab2[15] = "test_table2";
 static const char add_tab3[15] = "test_table3";
@@ -59,7 +59,7 @@ START_TEST(add_table) {
                   strcmp(add_tab3, entry->d_name) == 0);
 
         // assert correct file headers
-        char path[50] = {0};
+        char path[265] = {0};
         sprintf(path, "%s/%s", DBFILES_DIR, entry->d_name);
         int fd = open(path, O_RDONLY);
         uint8_t header_buf[PAGE_SIZE];
@@ -92,7 +92,6 @@ START_TEST(add_page) {
     ck_assert_int_eq(pid3, START_USER_PAGE);
 
     uint8_t *page = read_page(pid1, disk_mgr);
-    uint8_t *buf;
     // check correct header format
     ck_assert_uint_eq(decode_uint16(page), PAGE_HEADER_SIZE);
     ck_assert_uint_eq(decode_uint16(page + sizeof(uint16_t)), PAGE_SIZE - 1);
@@ -132,8 +131,8 @@ START_TEST(add_tuple_to_page) {
                             .num_columns = 2,
                             .tup_ptr_out = t_ptr2};
 
-    pthread_create(&t1, NULL, (void *(*)(void *))add_tuple, &t_args1);
-    pthread_create(&t2, NULL, (void *(*)(void *))add_tuple, &t_args2);
+    pthread_create(&t1, NULL, add_tuple, &t_args1);
+    pthread_create(&t2, NULL, add_tuple, &t_args2);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
@@ -192,7 +191,6 @@ START_TEST(remove_tuple_and_defragment) {
     // Perica and Marica are of same length for defragment testing convenience (that while loop)
     uint16_t name_len1 = strlen("Marica");
     uint16_t name_len2 = strlen("Perica");
-    uint16_t name_len3 = strlen("Nikolina");
     t_ptr1 = (TuplePtr *)malloc(sizeof(TuplePtr));
     t_ptr2 = (TuplePtr *)malloc(sizeof(TuplePtr));
     t_ptr3 = (TuplePtr *)malloc(sizeof(TuplePtr));
@@ -219,8 +217,6 @@ START_TEST(remove_tuple_and_defragment) {
     add_tuple(&t_args3);
     // Slot numbers are just initialized in a way that tuple pointers are currently being inserted in a page on disk,
     // but in the future there should probably be some function that gives this information instead
-    RID rid1 = {.pid = pid, .slot_num = 0};
-    RID rid2 = {.pid = pid, .slot_num = 1};
     RID rid3 = {.pid = pid, .slot_num = 2};
 
     uint8_t *page_before = read_page(pid, disk_mgr);

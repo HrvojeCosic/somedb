@@ -5,54 +5,81 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-// static BufferPoolManager *bpm;
-// static const page_id_t pid1 = 1, pid2 = 2;
-// static DiskManager *disk_manager;
-//
-// START_TEST(initialize) {
-//     char *filename = (char *)malloc(sizeof(char) * 11);
-//     strcpy(filename, "dbfile.bin");
-//     disk_manager = new_disk_manager(filename);
-//     const size_t pool_size = 3;
-//
-//     bpm = new_bpm(pool_size, disk_manager);
-//     ck_assert_int_eq(bpm->pool_size, pool_size);
-//     for (size_t i = 0; i < bpm->pool_size; i++) {
-//         ck_assert_int_eq(bpm->free_list[i], true);
-//     }
-// }
-//
-// END_TEST
-//
-// START_TEST(pin) {
-//     page_id_t pid1 = new_page(disk_manager);
-//     page_id_t pid2 = new_page(disk_manager);
-//     // write_page(read_page(pid1, disk_manager), disk_manager);
-//     // write_page(read_page(pid2, disk_manager), disk_manager);
-//
-//     BpmPage *bpm_page2 = new_bpm_page(bpm, pid2);
-//     BpmPage *bpm_page1 = new_bpm_page(bpm, pid1);
-//     ck_assert_int_eq(bpm_page1->is_dirty, false);
-//     ck_assert_int_eq(bpm_page1->pin_count, 1);
-//
-//     Header *page1_h = PAGE_HEADER(bpm_page1->data);
-//     Header *page2_h = PAGE_HEADER(bpm_page2->data);
-//     ck_assert_int_eq(page1_h->id, pid1);
-//     ck_assert_int_eq(page2_h->id, pid2);
-//
-//     BpmPage *dup_page1 = new_bpm_page(bpm, pid1);
-//     ck_assert_ptr_eq(dup_page1, bpm_page1);
-// }
-//
-// END_TEST
-//
-// START_TEST(unpin) {
-//     bool ok2 = unpin_page(pid1, false, bpm);
-//     ck_assert_int_eq(ok2, true);
-// }
-//
-// END_TEST
+static BufferPoolManager *bpm;
+static page_id_t pid;
+static DiskManager *disk_manager;
+static const char table_name[15] = "bpm_test";
+
+void teardown(void) { remove_table(table_name); }
+
+START_TEST(initialize) {
+    char col_n[4] = "bpm";
+    Column cols[1] = {{.name_len = 3, .name = col_n, .type = STRING}};
+    disk_manager = create_table("bpm_test", cols, 1);
+
+    const size_t pool_size = 3;
+
+    bpm = new_bpm(pool_size, disk_manager);
+    ck_assert_int_eq(bpm->pool_size, pool_size);
+    for (size_t i = 0; i < bpm->pool_size; i++) {
+        ck_assert_int_eq(bpm->free_list[i], true);
+    }
+}
+
+END_TEST
+
+START_TEST(pin) {
+    pid = new_page(disk_manager);
+
+    BpmPage *bpm_page = new_bpm_page(bpm, pid);
+    ck_assert_int_eq(bpm_page->is_dirty, false);
+    ck_assert_int_eq(bpm_page->pin_count, 1);
+
+    Header *page1_h = PAGE_HEADER(bpm_page->data);
+    ck_assert_int_eq(page1_h->id, 0);
+
+    BpmPage *dup_page = new_bpm_page(bpm, pid);
+    ck_assert_ptr_eq(dup_page, bpm_page);
+}
+
+END_TEST
+
+START_TEST(unpin) {
+    bool ok1 = unpin_page(pid, false, bpm);
+    ck_assert_int_eq(ok1, true);
+    bool ok2 = unpin_page(pid, false, bpm);
+    ck_assert_int_eq(ok2, false);
+
+    char pid_str[11];
+    sprintf(pid_str, "%d", pid);
+    HashEl *el = hash_find(pid_str, bpm->page_table);
+    ck_assert_int_eq(*(bool *)el->data, false); // dirty bit unset
+}
+
+END_TEST
+
+START_TEST(flush_page_test) {
+    char pid_str[11], fid_str[11];
+    sprintf(pid_str, "%d", pid);
+    HashEl *entry_before_flush = hash_find(pid_str, bpm->page_table);
+    frame_id_t fid = *(frame_id_t *)entry_before_flush->data;
+    sprintf(pid_str, "%d", fid);
+    ck_assert_int_eq(bpm->free_list[fid], false);
+
+    bool ok1 = flush_page(pid, bpm);
+    ck_assert_int_eq(ok1, true);
+
+    HashEl *entry_after_flush = hash_find(pid_str, bpm->page_table);
+    ck_assert_ptr_null(entry_after_flush);
+    ck_assert_int_eq(bpm->free_list[fid], true);
+
+    bool ok2 = flush_page(pid, bpm);
+    ck_assert_int_eq(ok2, false);
+}
+
+END_TEST
 
 Suite *page_suite(void) {
     Suite *s;
@@ -62,9 +89,13 @@ Suite *page_suite(void) {
 
     tc_core = tcase_create("Core");
 
-    // tcase_add_test(tc_core, initialize);
-    // tcase_add_test(tc_core, pin);
-    // tcase_add_test(tc_core, unpin);
+    tcase_add_test(tc_core, initialize);
+    tcase_add_test(tc_core, pin);
+    tcase_add_test(tc_core, unpin);
+    tcase_add_test(tc_core, flush_page_test);
+
+    tcase_add_checked_fixture(tc_core, NULL, teardown);
+
     suite_add_tcase(s, tc_core);
 
     return s;

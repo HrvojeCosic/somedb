@@ -38,9 +38,9 @@ START_TEST(insert_find) {
     HashInsertArgs in_args1 = {.key = key1, .data = val1, .ht = ht};
     HashInsertArgs in_args2 = {.key = key2, .data = val2, .ht = ht};
     HashInsertArgs in_args3 = {.key = key3, .data = val3, .ht = ht};
-    pthread_create(&t1, NULL, (void *(*)(void *))hash_insert, &in_args1);
-    pthread_create(&t2, NULL, (void *(*)(void *))hash_insert, &in_args2);
-    pthread_create(&t3, NULL, (void *(*)(void *))hash_insert, &in_args3);
+    pthread_create(&t1, NULL, hash_insert, &in_args1);
+    pthread_create(&t2, NULL, hash_insert, &in_args2);
+    pthread_create(&t3, NULL, hash_insert, &in_args3);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
     pthread_join(t3, NULL);
@@ -74,23 +74,23 @@ START_TEST(insert_find) {
 }
 
 START_TEST(remove_entry) {
-    HashRemoveArgs rm_args = {.key = key2, .ht = ht};
-    pthread_create(&t1, NULL, (void *(*)(void *))hash_remove, &rm_args);
-    pthread_create(&t2, NULL, (void *(*)(void *))hash_remove, &rm_args); // remove sole bucket el.
+    HashRemoveArgs rm_args = {.key = key2, .ht = ht, .success_out = NULL};
+    pthread_create(&t1, NULL, hash_remove, &rm_args);
+    pthread_create(&t2, NULL, hash_remove, &rm_args); // remove sole bucket el.
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
     ck_assert_ptr_null(hash_find(key2, ht));
     HashInsertArgs in_args = {.key = key3, .data = val3, .ht = ht};
     hash_insert(&in_args);
-    HashRemoveArgs rm_args2 = {.key = key3, .ht = ht};
+    HashRemoveArgs rm_args2 = {.key = key3, .ht = ht, .success_out = NULL};
     hash_remove(&rm_args2); // Remove first element in a multiple-element bucket
     page_id_t *val3_second = (page_id_t *)malloc(sizeof(page_id_t));
     *val3_second = 32;
     char *key3_second = (char *)malloc(sizeof(char) * 3);
     HashInsertArgs in_args2 = {.key = key3_second, .data = val3_second, .ht = ht};
     hash_insert(&in_args2);
-    HashRemoveArgs rm_args3 = {.key = key1, .ht = ht};
+    HashRemoveArgs rm_args3 = {.key = key1, .ht = ht, .success_out = NULL};
     hash_remove(&rm_args3);
 }
 

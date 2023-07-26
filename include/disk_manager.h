@@ -41,7 +41,6 @@ typedef struct {
     page_id_t id;
     uint16_t free_start; // offset to beginning of available page memory
     uint16_t free_end;   // offset to end of available page memory
-    uint16_t free_total; // total available page memory
     uint8_t flags;
 } Header;
 
@@ -151,7 +150,7 @@ uint8_t *read_page(page_id_t page_id, DiskManager *disk_manager);
  * Adds tuple to a page through the provided table's disk manager and sets a pointer to beginning of
  * added tuple in the tup_ptr_out data argument. If the page is full, immediately returns a null pointer
  */
-void add_tuple(void *data_args);
+void *add_tuple(void *data_args);
 
 typedef struct {
     DiskManager *disk_manager;

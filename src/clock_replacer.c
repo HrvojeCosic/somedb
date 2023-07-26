@@ -44,7 +44,7 @@ frame_id_t evict(ClockReplacer *replacer) {
             continue;
         } else {
             frame_id_t frame_id = atoi(frame_info->key);
-            HashRemoveArgs rm_args = {.key = curr_frame, .ht = replacer->frame_table};
+            HashRemoveArgs rm_args = {.key = curr_frame, .ht = replacer->frame_table, .success_out = NULL};
             hash_remove(&rm_args);
             circular_list_remove(curr_frame, replacer->frames);
             RWLOCK_UNLOCK(&replacer->latch);
