@@ -71,6 +71,15 @@ typedef struct {
 } Column;
 
 /*
+ * Record id (RID) is a unique identifier for a record with information necessary to
+ * find the corresponding page and the offset in that page using the slot number
+ */
+typedef struct {
+    page_id_t pid;
+    uint32_t slot_num;
+} RID;
+
+/*
  * Creates a database table with provided COLUMNS if it doesn't already exist under the same TABLE_NAME.
  * Returns a newly created disk manager instance through which all table changes are made
  *

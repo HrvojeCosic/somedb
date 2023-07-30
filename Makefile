@@ -8,7 +8,7 @@ TEST_DIR=    test
 BUILD_DIR=   build
 CXX=         g++
 OPT=         -O0
-CPP_VER=     -std=c++20
+CPP_VER=     -std=c++17
 
 #=================================================================================================================
 #### FLAGS & FILES
@@ -66,7 +66,7 @@ $(TEST_DIR)/bin/%: $(TEST_DIR)/%.c $(CFILES)
 	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(CHECK_LIBS) $(TESTFLAGS)
 
 $(TEST_DIR)/bin/%: $(TEST_DIR)/%.cpp $(CPPFILES)
-	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.cpp,$(CPPFILES)) $(GTEST_LIBS) $(TESTFLAGS)
+	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.cpp,$(CPPFILES)) $(CFILES) $(GTEST_LIBS) $(TESTFLAGS)
 
 $(TEST_DIR)/bin:
 	mkdir -p $@

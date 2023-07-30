@@ -61,7 +61,7 @@ START_TEST(unpin) {
 END_TEST
 
 START_TEST(flush_page_test) {
-    char pid_str[11], fid_str[11];
+    char pid_str[11];
     sprintf(pid_str, "%d", pid);
     HashEl *entry_before_flush = hash_find(pid_str, bpm->page_table);
     frame_id_t fid = *(frame_id_t *)entry_before_flush->data;
