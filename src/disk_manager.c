@@ -120,7 +120,7 @@ DiskManager *create_table(const char *table_name, Column *columns, uint8_t n_col
 
 // for test only
 void remove_table(const char *table_name) {
-    char path[40];
+    char path[40] = {0};
     sprintf(path, "%s/%s.db", DBFILES_DIR, table_name);
     remove(path);
 }

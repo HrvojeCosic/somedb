@@ -11,7 +11,7 @@ class IndexTestFixture : public testing::Test {
     BufferPoolManager *bpm;
     DiskManager *disk_mgr;
 
-    const u16 tree_max_size = 5;
+    const u16 tree_max_size = 4;
 
     void SetUp() override {
         char cname1[5] = "name";
@@ -25,7 +25,7 @@ class IndexTestFixture : public testing::Test {
     void TearDown() override { remove_table(table_name); }
 };
 
-TEST_F(IndexTestFixture, InsertTestRootWithEnoughSpace) {
+TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
     auto tree = BTree(index_name, bpm, tree_max_size);
     std::string data1 = "Perica";
     BTreeKey key1 = {reinterpret_cast<u8 *>(data1.data()), static_cast<u16>(data1.length())};
@@ -35,13 +35,52 @@ TEST_F(IndexTestFixture, InsertTestRootWithEnoughSpace) {
     ASSERT_EQ((char *)tree.root->keys.at(0).data == data1, true);
     ASSERT_EQ(LEAF_RECORDS(tree.root->records).at(0).pid, 4);
 
-    std::string data2 = "Marica";
+    std::string data2 = "A.Marica"; // should go first after key sort
     BTreeKey key2 = {reinterpret_cast<u8 *>(data2.data()), static_cast<u16>(data2.length())};
     tree.insert(key2, val1);
-    ASSERT_EQ((char *)tree.root->keys.at(0).data == data1, true);
-    ASSERT_EQ((char *)tree.root->keys.at(1).data == data2, true);
+    ASSERT_EQ((char *)tree.root->keys.at(0).data == data2, true);
+    ASSERT_EQ((char *)tree.root->keys.at(1).data == data1, true);
     ASSERT_EQ(LEAF_RECORDS(tree.root->records).at(0).pid, val1.pid);
     ASSERT_EQ(LEAF_RECORDS(tree.root->records).at(1).pid, val1.pid);
+}
+
+TEST_F(IndexTestFixture, InsertTest_FullRoot) {
+    auto tree = BTree(index_name, bpm, tree_max_size);
+    RID val1 = {.pid = 1, .slot_num = 2};
+    RID val2 = {.pid = 3, .slot_num = 4};
+    RID val3 = {.pid = 5, .slot_num = 6};
+    RID val4 = {.pid = 7, .slot_num = 8};
+    RID val5 = {.pid = 9, .slot_num = 10};
+    std::string data1 = "A";
+    std::string data2 = "B";
+    std::string data3 = "D";
+    std::string data4 = "E";
+    std::string data5 = "C";
+    BTreeKey key1 = {reinterpret_cast<u8 *>(data1.data()), static_cast<u16>(data1.length())};
+    BTreeKey key2 = {reinterpret_cast<u8 *>(data2.data()), static_cast<u16>(data2.length())};
+    BTreeKey key3 = {reinterpret_cast<u8 *>(data3.data()), static_cast<u16>(data3.length())};
+    BTreeKey key4 = {reinterpret_cast<u8 *>(data4.data()), static_cast<u16>(data4.length())};
+    BTreeKey key5 = {reinterpret_cast<u8 *>(data5.data()), static_cast<u16>(data5.length())};
+
+    tree.insert(key1, val1);
+    tree.insert(key2, val2);
+    tree.insert(key3, val3);
+    tree.insert(key4, val4);
+
+    // Test duplicate
+    auto pre_size = tree.root->keys.size();
+    bool ok = tree.insert(key1, val1);
+    ASSERT_EQ(ok, false);
+    ASSERT_EQ(tree.root->keys.size(), pre_size);
+
+    // Test node split
+    tree.insert(key5, val5);
+    ASSERT_EQ((char *)tree.root->keys.at(0).data == data5, true); // "C" in middle
+    ASSERT_EQ(tree.root->keys.size(), 1);
+    std::vector<BTreeKey> left_node_keys = {key1, key2};        // A B
+    std::vector<BTreeKey> right_node_keys = {key5, key3, key4}; // C D E
+    ASSERT_EQ(INTERNAL_CHILDREN(tree.root->children).at(0)->keys == left_node_keys, true);
+    ASSERT_EQ(INTERNAL_CHILDREN(tree.root->children).at(1)->keys == right_node_keys, true);
 }
 
 TEST_F(IndexTestFixture, DISABLED_GetValue1) {}
