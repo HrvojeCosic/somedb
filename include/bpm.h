@@ -10,7 +10,7 @@
 
 typedef struct {
     page_id_t id;
-    uint8_t *data[PAGE_SIZE];
+    uint8_t data[PAGE_SIZE];
     int pin_count; // number of threads using this bpm page
     bool is_dirty; // shows if the page has been modified after being read from
                    // disk
@@ -46,12 +46,10 @@ bool unpin_page(page_id_t id, bool is_dirty, BufferPoolManager *bpm);
 bool flush_page(page_id_t id, BufferPoolManager *bpm);
 
 /*
- * Creates a new page of the provided id in the buffer pool BPM and returns a
- * pointer to it. If no frame is available or evictable, returns a null pointer.
- * Writes a possible in replacement frame back to disk if it contains a dirty
- * page
+ * Allocates a new page of suitable TYPE on disk, places it in buffer pool BPM and returns a pointer to it.
+ * Writes a possible replacement frame back to disk if it contains a dirty page.
  */
-BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t id);
+page_id_t allocate_new_page(BufferPoolManager *bpm, PageType type);
 
 /*
  * Returns the requested page from the buffer pool, or returns a null pointer if

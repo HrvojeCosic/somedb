@@ -1,6 +1,7 @@
 #include "../include/bpm.h"
 #include "../include/disk_manager.h"
 #include "../include/hash.h"
+#include "../include/heapfile.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <search.h>
@@ -36,7 +37,11 @@ static void add_to_pagetable(page_id_t key, frame_id_t *val, BufferPoolManager *
     hash_insert(&in_args);
 }
 
-BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
+/*
+ * Helper function for creating a page in the buffer pool.
+ * If no frame is available or evictable, returns a null pointer.
+ */
+static BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
     // Return early if already exists
     char pid_str[11];
     sprintf(pid_str, "%d", pid);
@@ -56,20 +61,43 @@ BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
             break;
         }
     }
-    if (*fid == UINT32_MAX)
+    if (*fid == UINT32_MAX) {
         *fid = evict(&bpm->replacer);
-    if (*fid == UINT32_MAX)
-        return NULL;
-    else if (bpm->pages[*fid].is_dirty)
-        flush_page(*fid, bpm);
+        if (*fid == UINT32_MAX)
+            return NULL;
+        else if (bpm->pages[*fid].is_dirty)
+            flush_page(*fid, bpm);
+    }
 
-    BpmPage page = {.id = *fid, .data = NULL, .pin_count = 1, .is_dirty = false};
+    BpmPage page;
+    page.id = *fid;
+    page.pin_count = 1;
+    page.is_dirty = false;
+    memset(page.data, 0, PAGE_SIZE);
     bpm->pages[*fid] = page;
 
     add_to_pagetable(pid, fid, bpm);
     clock_replacer_pin(fid, &bpm->replacer);
 
     return bpm->pages + *fid;
+}
+
+page_id_t allocate_new_page(BufferPoolManager *bpm, PageType type) {
+    page_id_t pid;
+    BpmPage *bpm_page = NULL;
+
+    switch (type) {
+    case HEAP_PAGE:
+        pid = new_heap_page(bpm->disk_manager);
+        while (bpm_page == NULL)
+            bpm_page = new_bpm_page(bpm, pid);
+        break;
+    case BTREE_INDEX_PAGE: // TODO
+        pid = 0;
+        break;
+    }
+
+    return pid;
 }
 
 bool unpin_page(page_id_t page_id, bool is_dirty, BufferPoolManager *bpm) {

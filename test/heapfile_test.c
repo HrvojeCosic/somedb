@@ -1,4 +1,5 @@
 #include "../include/disk_manager.h"
+#include "../include/heapfile.h"
 #include "../include/serialize.h"
 #include <check.h>
 #include <dirent.h>
@@ -81,9 +82,9 @@ END_TEST
 START_TEST(add_page) {
     Column *cols = {0};
     DiskManager *disk_mgr = create_table(add_page_tab, cols, 0);
-    page_id_t pid1 = new_page(disk_mgr);
-    page_id_t pid2 = new_page(disk_mgr);
-    page_id_t pid3 = new_page(disk_mgr);
+    page_id_t pid1 = new_heap_page(disk_mgr);
+    page_id_t pid2 = new_heap_page(disk_mgr);
+    page_id_t pid3 = new_heap_page(disk_mgr);
 
     // all three should get same (first) page id as it's not being occupied by tuples
     // TODO: make it thread safe (track a dirty bit or something)
@@ -107,7 +108,7 @@ START_TEST(add_tuple_to_page) {
                       {.name_len = (uint8_t)strlen(cname2), .name = cname2, .type = UINT16}};
     const char add_tuple_tab[25] = "add_tuple_to_page_test";
     DiskManager *disk_mgr = create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
-    page_id_t pid = new_page(disk_mgr);
+    page_id_t pid = new_heap_page(disk_mgr);
 
     const char *col_names[2] = {"name", "age"};
     const char *col_names2[2] = {"wrong_col", "another_wrong_col"};
@@ -181,7 +182,7 @@ START_TEST(remove_tuple_and_defragment) {
     Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = STRING},
                       {.name_len = (uint8_t)strlen(cname2), .name = cname2, .type = UINT16}};
     DiskManager *disk_mgr = create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
-    page_id_t pid = new_page(disk_mgr);
+    page_id_t pid = new_heap_page(disk_mgr);
 
     const char *col_names[2] = {"name", "age"};
     ColumnType col_types[2] = {STRING, UINT16};

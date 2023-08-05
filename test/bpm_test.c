@@ -1,4 +1,5 @@
 #include "../include/bpm.h"
+#include "../include/heapfile.h"
 #include <check.h>
 #include <fcntl.h>
 #include <search.h>
@@ -31,17 +32,14 @@ START_TEST(initialize) {
 END_TEST
 
 START_TEST(pin) {
-    pid = new_page(disk_manager);
+    pid = allocate_new_page(bpm, HEAP_PAGE);
+    BpmPage *bpm_page = fetch_bpm_page(pid, bpm);
 
-    BpmPage *bpm_page = new_bpm_page(bpm, pid);
     ck_assert_int_eq(bpm_page->is_dirty, false);
-    ck_assert_int_eq(bpm_page->pin_count, 1);
+    ck_assert_int_eq(bpm_page->pin_count, 2); // newpage + fetchpage
 
     Header *page1_h = PAGE_HEADER(bpm_page->data);
     ck_assert_int_eq(page1_h->id, 0);
-
-    BpmPage *dup_page = new_bpm_page(bpm, pid);
-    ck_assert_ptr_eq(dup_page, bpm_page);
 }
 
 END_TEST
@@ -49,8 +47,10 @@ END_TEST
 START_TEST(unpin) {
     bool ok1 = unpin_page(pid, false, bpm);
     ck_assert_int_eq(ok1, true);
+
+    unpin_page(pid, false, bpm);
     bool ok2 = unpin_page(pid, false, bpm);
-    ck_assert_int_eq(ok2, false);
+    ck_assert_int_eq(ok2, false); // once for newpage once for fetchpage
 
     char pid_str[11];
     sprintf(pid_str, "%d", pid);
