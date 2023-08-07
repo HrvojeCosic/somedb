@@ -11,6 +11,8 @@
 
 #define FRAME(f) *(frame_id_t *)f
 
+#define BTREE_INDEX 0x951F6C01 // magic number for the index metadata page
+
 typedef uint32_t page_id_t;
 typedef uint32_t frame_id_t;
 
@@ -24,7 +26,7 @@ enum PageType { HEAP_PAGE = 1, BTREE_INDEX_PAGE = 2 };
  * Record id (RID) is a unique identifier for a record with information necessary to
  * find the corresponding page and the offset in that page using the slot number
  */
-#define RID_SIZE 8
+#define RID_SIZE sizeof(u32) * 2
 
 typedef struct {
     page_id_t pid;

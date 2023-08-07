@@ -46,6 +46,7 @@ DiskManager *create_table(const char *table_name, Column *columns, uint8_t n_col
     off_t offset = lseek(fd, 0, SEEK_END);
     if (offset != 0) {
         printf("Table with that name already exists");
+        close(fd);
         return NULL;
     }
 

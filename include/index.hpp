@@ -22,56 +22,104 @@
 #define BREADCRUMB_TYPE std::pair<BTreePage *, int>
 
 #define LEAF_RECORDS(records) std::get<std::vector<RID>>(records)
-#define INTERNAL_CHILDREN(children) std::get<std::vector<BTreePage *>>(children)
+#define INTERNAL_CHILDREN(children) std::get<std::vector<u32>>(children)
+#define INDEX_PAGE_HEADER_SIZE 17
 
-/* Template of functions that work with nodes and support both node types */
-#define TREE_NODE_FUNC_TYPE                                                                                            \
+/*
+ * When creating a BTreePage class, we need to specify whether it's of internal or leaf type by passing RID or u16
+ * (which are types of values for these node types, respectively
+ */
+#define TREE_NODE_TYPE                                                                                                 \
     template <typename VAL_T>                                                                                          \
-    requires(std::same_as<VAL_T, RID> || std::same_as<VAL_T, BTreePage *>)
+    requires(std::same_as<VAL_T, RID> || std::same_as<VAL_T, u16>)
 
 namespace somedb {
 
+using leaf_records = std::vector<RID>;
+using internal_pointers = std::vector<u32>;
+
 struct BTreeKey {
     u8 *data;
-    u16 length;
+    u8 length;
 
     bool operator==(const BTreeKey &other) const {
         return (length == other.length) && (std::memcmp(data, other.data, length) == 0);
     }
 };
 
-struct BTreePage {
-    bool is_leaf;
-    uint16_t max_size; // max number of elements in a node (aka node's degree-1)
-    uint16_t level;    // starting from 0
-    std::vector<BTreeKey> keys;
+/* BTree struct is an in memory representation of a metadata page stored in an index file.
+ *
+ * The index file starts with the metadata page of the following format:
+ * (32 bit uint) magic number, expected to equal BTREE_INDEX
+ * (16 bit uint) current number of nodes, not including root
+ * (8 bit uint) max number of keys in a node (max size/node's degree - 1)
+ */
+struct BTree {
+    DiskManager *disk_manager;
+    u32 magic_num;
+    u16 node_count;
+    u8 max_size;
 
-    /* Tracking siblings for sequential scan across leaf nodes */
-    BTreePage *previous;
-    BTreePage *next;
+    u8 *serialize() const;
 
-    /*
-     * Depending on the node type, store either
-     *  record ids of tuples (leaf) or pointers to descendants (internal)
-     */
-    std::variant<std::vector<RID>, std::vector<BTreePage *>> records, children;
+    void deserialize(u8 data[PAGE_SIZE]);
 
-    BTreePage(bool is_leaf, u16 max_size);
+    static page_id_t new_page();
+
+    static DiskManager *create_index(const char *idx_name, const u8 max_keys);
 };
 
-struct BTree {
-    std::string index_name;
-    BTreePage *root;
-    BufferPoolManager *bpm; // layer for fetching pages from memory into tree pages (aka tree nodes
+/*
+ * On disk, following the metadata page, there is a list of b+tree pages
+ *
+ * Each b+tree page is layed out in the slotted page format (like in heap files), with the page header including:
+ *  (16 bit uint) page offset to the beginning of available space
+ *  (16 bit uint) page offset to the end of available space
+ *  (32 bit uint) file offset to the previous (sibling) page
+ *  (32 bit uint) file offset to the next (sibling) page
+ *  (16 bit uint) page offset to the rightmost pointer (set to 0 for leaf nodes, which is a way of identifying leafs)
+ *  (16 bit uint) node's level in the tree (0 for root)
+ *  (8 bit uint) special page header flags
+ *
+ *  Key-value pair pointers consists of:
+ *  -16 bit unsigned integer representing the page offset to the corresponding kv pair
+ *  -16 bit unsigned integer representing the kv pair size
+ *
+ *  Key-value pairs consist of:
+ *  (8 bit uint) length of variable-sized key (n)
+ *  (n) variable sized key
+ *  (32 bit uint OR 2x32 bit uint) child pointer OR RID=(page_id, slot_num)
+ */
+TREE_NODE_TYPE struct BTreePage {
+    bool is_leaf;
+    u16 level; // starting from 0
+    std::vector<BTreeKey> keys;
+    u8 flags;
 
-    BTree(std::string index_name, BufferPoolManager *bpm, uint16_t max_size = 8, BTreePage *root = nullptr);
-    //~BPlusTree(); // TODO: DEALLOCATE TREE MEMORY
+    /*
+     * Tracking siblings for sequential scan across leaf nodes.
+     * only storing their file offsets so it's not necessary to load them from disk before referencing them
+     */
+    u32 previous_off;
+    u32 next_off;
+
+    u32 rightmost_ptr_off;
+
+    /* Depending on the node type, store either record ids of tuples (leaf) or pointers (file offsets) to descendants
+     * (internal). */
+    std::variant<std::vector<RID>, std::vector<u32>> records, children;
+    //--------------------------------------------------------------------------------------------------------------------------------
+
+    u8 *serialize() const;
+
+    void deserialize(u8 data[PAGE_SIZE]);
 
     bool getValues(const BTreeKey &key, std::vector<RID> &result);
 
     /* Insert element into the tree and return true if successful, of false if provided key already exists */
     bool insert(const BTreeKey &key, const RID &val);
 
+    //--------------------------------------------------------------------------------------------------------------------------------
   private:
     BTreePage *findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs);
 
@@ -83,10 +131,8 @@ struct BTree {
      * Provided VAL can be of two types (as seen in BTreePage), depending on if insertion is being done in leaf or
      * internal node
      */
-    TREE_NODE_FUNC_TYPE
     void insertIntoNode(BTreePage *node, const BTreeKey &key, VAL_T val);
 
-    TREE_NODE_FUNC_TYPE
     inline auto get_node_vals(BTreePage *node);
 
     /* If first key is bigger return >0, if second is bigger return <0, if equal 0 */
@@ -104,8 +150,8 @@ struct BTree {
     template <typename T> inline static std::vector<T> vec_first_half(std::vector<T> full_vec) {
         return {full_vec.begin(), full_vec.begin() + full_vec.size() / 2};
     }
-};
 
-using internal_pointers = std::vector<BTreePage *>;
+    //--------------------------------------------------------------------------------------------------------------------------------
+};
 
 } // namespace somedb

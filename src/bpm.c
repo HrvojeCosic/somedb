@@ -2,6 +2,8 @@
 #include "../include/disk_manager.h"
 #include "../include/hash.h"
 #include "../include/heapfile.h"
+#include "../include/serialize.h"
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <search.h>
@@ -9,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 BufferPoolManager *new_bpm(const size_t pool_size, DiskManager *disk_manager) {
     BpmPage *pages = (BpmPage *)calloc(sizeof(BpmPage), pool_size);
@@ -89,13 +92,14 @@ page_id_t allocate_new_page(BufferPoolManager *bpm, PageType type) {
     switch (type) {
     case HEAP_PAGE:
         pid = new_heap_page(bpm->disk_manager);
-        while (bpm_page == NULL)
-            bpm_page = new_bpm_page(bpm, pid);
         break;
-    case BTREE_INDEX_PAGE: // TODO
-        pid = 0;
+    case BTREE_INDEX_PAGE:
+        pid = new_btree_index_page(bpm->disk_manager);
         break;
     }
+
+    while (bpm_page == NULL)
+        bpm_page = new_bpm_page(bpm, pid);
 
     return pid;
 }

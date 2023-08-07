@@ -1,11 +1,13 @@
 #include "../include/disk_manager.h"
 #include "../include/serialize.h"
 #include "../include/shared.h"
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -71,3 +73,46 @@ void remove_table(const char *table_name) {
     sprintf(path, "%s/%s.db", DBFILES_DIR, table_name);
     remove(path);
 }
+
+// B+tree disk handling methods used by buffer pool, which is in C
+// (so I don't have to deal with linking complications that would arise in test files from declaring these in index.cpp)
+// probably solve this properly if there are more issues like this in the future, but this will do for now
+//-------------------------------------------------------------------------------------------------
+page_id_t new_btree_index_page(DiskManager *disk_manager) {
+    u8 *metadata_page = read_page(0, disk_manager);
+    assert(decode_uint32(metadata_page) == BTREE_INDEX);
+
+    u16 curr_node_num = decode_uint16(metadata_page + sizeof(u32));
+    u16 new_node_num = curr_node_num + 1;
+    encode_uint16(new_node_num, metadata_page);
+    write_page(0, disk_manager, metadata_page);
+    return new_node_num;
+}
+
+DiskManager *create_btree_index(const char *idx_name, const u8 max_keys) {
+    DiskManager *disk_mgr = (DiskManager *)malloc(sizeof(DiskManager));
+    disk_mgr->table_name = (char *)malloc(sizeof(char) * 25);
+    strcpy(disk_mgr->table_name, idx_name);
+    RWLOCK l;
+    RWLOCK_INIT(&l);
+    disk_mgr->latch = l;
+
+    int fd = table_file(disk_mgr->table_name);
+
+    off_t offset = lseek(fd, 0, SEEK_END);
+    if (offset != 0) {
+        printf("Index with that name already exists");
+        close(fd);
+        return NULL;
+    }
+
+    u8 index_buf[PAGE_SIZE] = {0};
+    encode_uint32(BTREE_INDEX, index_buf);
+    encode_uint16(0, index_buf + sizeof(u32));
+    memcpy(index_buf + sizeof(u32) + sizeof(u16), &max_keys, 1);
+
+    write(fd, index_buf, PAGE_SIZE);
+    return disk_mgr;
+}
+
+//-------------------------------------------------------------------------------------------------
