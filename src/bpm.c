@@ -85,7 +85,7 @@ static BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
     return bpm->pages + *fid;
 }
 
-page_id_t allocate_new_page(BufferPoolManager *bpm, PageType type) {
+BpmPage *allocate_new_page(BufferPoolManager *bpm, PageType type) {
     page_id_t pid;
     BpmPage *bpm_page = NULL;
 
@@ -101,7 +101,8 @@ page_id_t allocate_new_page(BufferPoolManager *bpm, PageType type) {
     while (bpm_page == NULL)
         bpm_page = new_bpm_page(bpm, pid);
 
-    return pid;
+    bpm_page->id = pid;
+    return bpm_page;
 }
 
 bool unpin_page(page_id_t page_id, bool is_dirty, BufferPoolManager *bpm) {

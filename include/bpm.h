@@ -49,7 +49,7 @@ bool flush_page(page_id_t id, BufferPoolManager *bpm);
  * Allocates a new page of suitable TYPE on disk, places it in buffer pool BPM and returns a pointer to it.
  * Writes a possible replacement frame back to disk if it contains a dirty page.
  */
-page_id_t allocate_new_page(BufferPoolManager *bpm, PageType type);
+BpmPage *allocate_new_page(BufferPoolManager *bpm, PageType type);
 
 /*
  * Returns the requested page from the buffer pool, or returns a null pointer if

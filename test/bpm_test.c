@@ -32,11 +32,11 @@ START_TEST(initialize) {
 END_TEST
 
 START_TEST(pin) {
-    pid = allocate_new_page(bpm, HEAP_PAGE);
-    BpmPage *bpm_page = fetch_bpm_page(pid, bpm);
+    BpmPage *bpm_page = allocate_new_page(bpm, HEAP_PAGE);
+    pid = bpm_page->id;
 
     ck_assert_int_eq(bpm_page->is_dirty, false);
-    ck_assert_int_eq(bpm_page->pin_count, 2); // newpage + fetchpage
+    ck_assert_int_eq(bpm_page->pin_count, 1);
 
     Header *page1_h = PAGE_HEADER(bpm_page->data);
     ck_assert_int_eq(page1_h->id, 0);
@@ -49,8 +49,8 @@ START_TEST(unpin) {
     ck_assert_int_eq(ok1, true);
 
     unpin_page(pid, false, bpm);
-    bool ok2 = unpin_page(pid, false, bpm);
-    ck_assert_int_eq(ok2, false); // once for newpage once for fetchpage
+    bool ok2 = unpin_page(pid, false, bpm); // once for newpage once for fetchpage
+    ck_assert_int_eq(ok2, false);
 
     char pid_str[11];
     sprintf(pid_str, "%d", pid);
