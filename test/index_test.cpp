@@ -1,6 +1,7 @@
 #include "../include/bpm.h"
+#include "../include/btree_index.hpp"
 #include "../include/heapfile.h"
-#include "../include/index.hpp"
+#include "../include/index_page.hpp"
 #include "../include/serialize.h"
 #include <cstring>
 #include <gtest/gtest.h>

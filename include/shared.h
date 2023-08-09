@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <pthread.h>
 #include <stdint.h>
 
@@ -32,3 +33,12 @@ typedef struct {
     page_id_t pid;
     uint32_t slot_num;
 } RID;
+
+struct BTreeKey {
+    u8 *data;
+    u8 length;
+
+    bool operator==(const BTreeKey &other) const {
+        return (length == other.length) && (std::memcmp(data, other.data, length) == 0);
+    }
+};
