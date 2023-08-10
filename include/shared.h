@@ -21,7 +21,7 @@ typedef uint32_t u32;
 typedef uint16_t u16;
 typedef uint8_t u8;
 
-enum PageType { HEAP_PAGE = 1, BTREE_INDEX_PAGE = 2 };
+enum PageType { HEAP_PAGE = 1, BTREE_INDEX_PAGE = 2, INVALID = 0 };
 
 /*
  * Record id (RID) is a unique identifier for a record with information necessary to

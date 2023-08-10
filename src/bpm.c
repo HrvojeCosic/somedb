@@ -73,7 +73,7 @@ static BpmPage *new_bpm_page(BufferPoolManager *bpm, page_id_t pid) {
     }
 
     BpmPage page;
-    page.id = *fid;
+    page.id = pid;
     page.pin_count = 1;
     page.is_dirty = false;
     memset(page.data, 0, PAGE_SIZE);
@@ -89,6 +89,7 @@ BpmPage *allocate_new_page(BufferPoolManager *bpm, PageType type) {
     page_id_t pid;
     BpmPage *bpm_page = NULL;
 
+    // Write page out to disk in appropriate format without populating the buffer pool for now
     switch (type) {
     case HEAP_PAGE:
         pid = new_heap_page(bpm->disk_manager);
@@ -96,12 +97,14 @@ BpmPage *allocate_new_page(BufferPoolManager *bpm, PageType type) {
     case BTREE_INDEX_PAGE:
         pid = new_btree_index_page(bpm->disk_manager);
         break;
+    case INVALID:
+        assert(type != INVALID); // "throw" error
+        break;
     }
 
     while (bpm_page == NULL)
         bpm_page = new_bpm_page(bpm, pid);
 
-    bpm_page->id = pid;
     return bpm_page;
 }
 
@@ -126,6 +129,11 @@ bool unpin_page(page_id_t page_id, bool is_dirty, BufferPoolManager *bpm) {
         clock_replacer_unpin((frame_id_t *)el->data, &bpm->replacer);
 
     return true;
+}
+
+void write_to_frame(frame_id_t fid, u8 *data, BufferPoolManager *bpm) {
+    memcpy(bpm->pages[fid].data, data, PAGE_SIZE);
+    bpm->pages[fid].is_dirty = true;
 }
 
 bool flush_page(page_id_t page_id, BufferPoolManager *bpm) {
@@ -157,12 +165,11 @@ BpmPage *fetch_bpm_page(page_id_t page_id, BufferPoolManager *bpm) {
         fid = *(frame_id_t *)entry->data;
         bpm->pages[fid].pin_count++;
         return bpm->pages + fid;
-    }
-
-    if (BpmPage *bpm_page = new_bpm_page(bpm, page_id)) {
-        bpm->pages[fid].pin_count++;
-        return bpm_page;
     } else {
-        return NULL;
+        BpmPage *newp = new_bpm_page(bpm, page_id); // TODO: handle NULL return (aka no space)
+        fid = *(frame_id_t *)hash_find(pid_str, bpm->page_table)->data;
+        bpm->pages[fid].pin_count++;
+        memcpy(newp->data, read_page(page_id, bpm->disk_manager), PAGE_SIZE);
+        return newp;
     }
 }

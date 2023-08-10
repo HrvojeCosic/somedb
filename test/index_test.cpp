@@ -5,6 +5,7 @@
 #include "../include/serialize.h"
 #include <cstring>
 #include <gtest/gtest.h>
+#include <string>
 
 namespace somedb {
 
@@ -25,6 +26,7 @@ class IndexTestFixture : public testing::Test {
         create_table(table_name, cols, (sizeof(cols) / sizeof(Column)));
 
         disk_mgr = create_btree_index(index_name, tree_max_size);
+        disk_mgr->page_type = BTREE_INDEX_PAGE;
         bpm = new_bpm(100, disk_mgr);
     }
 
@@ -34,15 +36,16 @@ class IndexTestFixture : public testing::Test {
     }
 };
 
-TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserialize) {
-    // check the tree metadata page (created with create_btree_index)
-    u8 *metadata = read_page(BTREE_METADATA_PAGE_ID, disk_mgr);
-    auto tree = new BTree(metadata, bpm);
+TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeTree) {
+    // check the tree metadata page (created with create_btree_index in the setup)
+    auto tree = new BTree(bpm);
+    tree->deserialize();
     ASSERT_EQ(tree->magic_num, BTREE_INDEX);
     ASSERT_EQ(tree->node_count, 0);
     ASSERT_EQ(tree->max_size, tree_max_size);
+}
 
-    // check if writing tree pages to disk is correct
+TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeNode) {
     auto page = new BTreePage(true);
     page->rightmost_ptr = 0;
     page->next = 256;
@@ -59,15 +62,28 @@ TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserialize) {
     BTreeKey key1 = {reinterpret_cast<u8 *>(data1.data()), static_cast<u8>(data1.length())};
     BTreeKey key2 = {reinterpret_cast<u8 *>(data2.data()), static_cast<u8>(data2.length())};
     BTreeKey key3{reinterpret_cast<u8 *>(data3.data()), static_cast<u8>(data3.length())};
+    u8 num_pairs = 3;
     page->keys = {key1, key2, key3};
 
+    // write to disk
     auto bpm_page = allocate_new_page(bpm, BTREE_INDEX_PAGE);
-    page_id_t pid = bpm_page->id;
-    write_page(pid, disk_mgr, page->serialize());
-    u8 *serialized = read_page(pid, disk_mgr);
-    ASSERT_EQ(decode_uint16(serialized), INDEX_PAGE_HEADER_SIZE + (4 * 3));        // free space start
-    ASSERT_EQ(decode_uint16(serialized + sizeof(u16)), PAGE_SIZE - (24 + 3 + 12)); // free space end
-                                                                                   //
+    frame_id_t *frame_id =
+        static_cast<frame_id_t *>(hash_find(std::to_string(bpm_page->id).data(), bpm->page_table)->data);
+    write_to_frame(*frame_id, page->serialize(), bpm);
+    flush_page(bpm_page->id, bpm);
+
+    // check if its correctly written to disk
+    u8 *serialized = read_page(bpm_page->id, disk_mgr);
+    ASSERT_EQ(decode_uint16(serialized + AVAILABLE_SPACE_START_OFFSET),
+              INDEX_PAGE_HEADER_SIZE + (TREE_KV_PTR_SIZE * num_pairs));
+    ASSERT_EQ(decode_uint16(serialized + AVAILABLE_SPACE_END_SIZE), PAGE_SIZE - (24 + 3 + 12));
+    ASSERT_EQ(decode_uint32(serialized + PREVIOUS_PID_OFFSET), page->previous);
+    ASSERT_EQ(decode_uint32(serialized + NEXT_PID_OFFSET), page->next);
+    ASSERT_EQ(decode_uint32(serialized + RIGHTMOST_PID_OFFSET), page->rightmost_ptr);
+    ASSERT_EQ(decode_uint16(serialized + TREE_LEVEL_OFFSET), page->level);
+    ASSERT_EQ(*(serialized + TREE_FLAGS_OFFSET), page->flags);
+
+    // deserialize into BTreePage
     auto page_deserialized = new BTreePage(serialized);
     ASSERT_EQ(page_deserialized->rightmost_ptr, page->rightmost_ptr);
     ASSERT_EQ(page_deserialized->is_leaf, page->is_leaf);
@@ -75,39 +91,46 @@ TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserialize) {
     ASSERT_EQ(page_deserialized->next, page->next);
     for (u8 i = 0; i < page_deserialized->keys.size(); i++) {
         // compare keys as they were added to keys read from end of page, same for values
-        ASSERT_EQ(page_deserialized->keys.at(i).length, page->keys.at(page->keys.size() - 1 - i).length);
-        ASSERT_EQ(*page_deserialized->keys.at(i).data, *page->keys.at(page->keys.size() - 1 - i).data);
+        ASSERT_EQ(page_deserialized->keys.at(i).length, page->keys.at(i).length);
+        ASSERT_EQ(*page_deserialized->keys.at(i).data, *page->keys.at(i).data);
 
         auto read_record = LEAF_RECORDS(page_deserialized->records).at(i);
-        auto actual_record = LEAF_RECORDS(page->records).at(LEAF_RECORDS(page->records).size() - 1 - i);
+        auto actual_record = LEAF_RECORDS(page->records).at(i);
         ASSERT_EQ(read_record.pid, actual_record.pid);
         ASSERT_EQ(read_record.slot_num, actual_record.slot_num);
     }
 }
 
 TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
-    //     // check the tree metadata page (created with create_btree_index)
-    //     u8 *metadata = read_page(BTREE_METADATA_PAGE_ID, disk_mgr);
-    //     auto tree = new BTree(metadata, bpm);
-    //
-    //     std::string data1 = "Perica";
-    //     BTreeKey key1 = {reinterpret_cast<u8 *>(data1.data()), static_cast<u8>(data1.length())};
-    //     RID val1 = {.pid = 4, .slot_num = 5}; // doesn't need to be actual rid
-    //     tree->insert(key1, val1);
-    //
-    //     auto bpm_page = fetch_bpm_page(tree->root_pid, tree->bpm);
-    //     auto root = new BTreePage(bpm_page->data);
-    //
-    //     ASSERT_EQ((char *)root->keys.at(0).data == data1, true);
-    //     ASSERT_EQ(LEAF_RECORDS(root->records).at(0).pid, val1.pid);
-    //
-    //     std::string data2 = "A.Marica"; // should go first after key sort
-    //     BTreeKey key2 = {reinterpret_cast<u8 *>(data2.data()), static_cast<u16>(data2.length())};
-    //     tree.insert(key2, val1);
-    //     ASSERT_EQ((char *)tree.root->keys.at(0).data == data2, true);
-    //     ASSERT_EQ((char *)tree.root->keys.at(1).data == data1, true);
-    //     ASSERT_EQ(LEAF_RECORDS(tree.root->records).at(0).pid, val1.pid);
-    //     ASSERT_EQ(LEAF_RECORDS(tree.root->records).at(1).pid, val1.pid);
+    // check the tree metadata page (created with create_btree_index)
+    u8 *metadata = read_page(BTREE_METADATA_PAGE_ID, bpm->disk_manager);
+    ASSERT_EQ(decode_uint32(metadata + MAGIC_NUMBER_OFFSET), BTREE_INDEX);
+    auto tree = new BTree(bpm);
+    tree->deserialize();
+
+    // insert kv pair
+    std::string data1 = "1";
+    BTreeKey key1 = {reinterpret_cast<u8 *>(data1.data()), static_cast<u8>(data1.length())};
+    RID val1 = {.pid = 4, .slot_num = 5}; // doesn't need to be actual rid
+    page_id_t leaf_pid = tree->insert(key1, val1);
+
+    auto bpm_page = fetch_bpm_page(leaf_pid, tree->bpm);
+    auto leaf = new BTreePage(bpm_page->data);
+
+    ASSERT_EQ(leaf->is_leaf, true);
+    ASSERT_EQ((char *)leaf->keys.at(0).data == data1, true);
+    ASSERT_EQ(LEAF_RECORDS(leaf->records).at(0).pid, val1.pid);
+
+    // insert another and check sorting
+    std::string data2 = "0";
+    BTreeKey key2 = {reinterpret_cast<u8 *>(data2.data()), static_cast<u8>(data2.length())};
+    leaf_pid = tree->insert(key2, val1);
+    bpm_page = fetch_bpm_page(leaf_pid, tree->bpm);
+    leaf = new BTreePage(bpm_page->data);
+    ASSERT_EQ((char *)leaf->keys.at(0).data == data2, true);
+    ASSERT_EQ((char *)leaf->keys.at(1).data == data1, true);
+    ASSERT_EQ(LEAF_RECORDS(leaf->records).at(0).pid, val1.pid);
+    ASSERT_EQ(LEAF_RECORDS(leaf->records).at(1).pid, val1.pid);
 }
 
 //

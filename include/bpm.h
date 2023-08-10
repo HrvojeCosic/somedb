@@ -9,8 +9,8 @@
 #include <stdint.h>
 
 typedef struct {
-    page_id_t id;
     uint8_t data[PAGE_SIZE];
+    page_id_t id;  // (p)id of page on disk (not frame)
     int pin_count; // number of threads using this bpm page
     bool is_dirty; // shows if the page has been modified after being read from
                    // disk
@@ -57,3 +57,9 @@ BpmPage *allocate_new_page(BufferPoolManager *bpm, PageType type);
  * Writes a possible replacement frame back to disk if it contains a dirty page
  */
 BpmPage *fetch_bpm_page(page_id_t page_id, BufferPoolManager *bpm);
+
+/*
+ * Writes provided data to a page contained in the provided frame id and marks it as dirty.
+ * This function does NOT write anything to disk
+ */
+void write_to_frame(frame_id_t fid, u8 *data, BufferPoolManager *bpm);

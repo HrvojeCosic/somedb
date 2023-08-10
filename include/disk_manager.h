@@ -10,6 +10,7 @@
 
 typedef struct {
     HashTable *page_directory; // table's page directory in memory representation, for saving some file seek expenses
+    PageType page_type;        // (usually optional) type of page present in a file handled by disk manager instance.
     char *table_name;
     RWLOCK latch;
 } DiskManager;

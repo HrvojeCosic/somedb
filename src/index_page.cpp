@@ -26,19 +26,20 @@ u8 *BTreePage::serialize() const {
     u16 available_space_end = PAGE_SIZE;
 
     // populate data with kv pairs and their pointers in slotted page format
-    for (u16 i = 0; i < this->keys.size(); i++) {
-        auto key = this->keys.at(i);
-        u8 val_size;
+    int i = keys.empty() ? 0 : (keys.size() - 1);
+    while (i >= 0) {
+        auto key = keys.at(i);
+        u8 val_size = 0;
         u8 val_buf[RID_SIZE];
-        if (this->is_leaf) {
-            RID val = LEAF_RECORDS(this->records).at(i);
+        if (is_leaf) {
+            RID val = LEAF_RECORDS(records).at(i);
             encode_uint32(val.pid, val_buf);
             encode_uint32(val.slot_num, val_buf + sizeof(u32));
-            val_size = RID_SIZE;
+            val_size += RID_SIZE;
         } else {
             auto children = INTERNAL_CHILDREN(this->children);
             encode_uint32(children.at(i), val_buf);
-            val_size = sizeof(u32);
+            val_size += sizeof(u32);
         }
         u16 kv_size = val_size + key.length + sizeof(key.length);
         u16 kv_start = available_space_end - kv_size;
@@ -52,26 +53,26 @@ u8 *BTreePage::serialize() const {
 
         available_space_end -= kv_size;
         available_space_start += TREE_KV_PTR_SIZE;
+        i--;
     }
 
     encode_uint16(available_space_start, data + AVAILABLE_SPACE_START_OFFSET);
     encode_uint16(available_space_end, data + AVAILABLE_SPACE_END_OFFSET);
-    encode_uint32(this->previous, data + PREVIOUS_PID_OFFSET);
-    encode_uint32(this->next, data + NEXT_PID_OFFSET);
-    encode_uint16(this->rightmost_ptr, data + RIGHTMOST_PID_OFFSET);
-    encode_uint16(this->level, data + TREE_LEVEL_OFFSET);
-    memcpy(data + TREE_FLAGS_OFFSET, &this->flags, TREE_FLAGS_SIZE);
+    encode_uint32(previous, data + PREVIOUS_PID_OFFSET);
+    encode_uint32(next, data + NEXT_PID_OFFSET);
+    encode_uint16(rightmost_ptr, data + RIGHTMOST_PID_OFFSET);
+    encode_uint16(level, data + TREE_LEVEL_OFFSET);
+    memcpy(data + TREE_FLAGS_OFFSET, &flags, TREE_FLAGS_SIZE);
 
     return data;
 }
 
 BTreePage::BTreePage(u8 data[PAGE_SIZE]) : is_leaf(get_is_leaf(data)) {
-
-    this->previous = decode_uint32(data + PREVIOUS_PID_OFFSET);
-    this->next = decode_uint32(data + NEXT_PID_OFFSET);
-    this->rightmost_ptr = decode_uint32(data + RIGHTMOST_PID_OFFSET);
-    this->level = decode_uint16(data + TREE_LEVEL_OFFSET);
-    memcpy(&this->flags, data + TREE_FLAGS_OFFSET, TREE_FLAGS_SIZE);
+    previous = decode_uint32(data + PREVIOUS_PID_OFFSET);
+    next = decode_uint32(data + NEXT_PID_OFFSET);
+    rightmost_ptr = decode_uint32(data + RIGHTMOST_PID_OFFSET);
+    level = decode_uint16(data + TREE_LEVEL_OFFSET);
+    memcpy(&flags, data + TREE_FLAGS_OFFSET, TREE_FLAGS_SIZE);
 
     u16 kv_pairs_cursor = decode_uint16(data + AVAILABLE_SPACE_END_OFFSET);
     while (kv_pairs_cursor < PAGE_SIZE) {
@@ -80,21 +81,21 @@ BTreePage::BTreePage(u8 data[PAGE_SIZE]) : is_leaf(get_is_leaf(data)) {
         key.data = new u8[key.length];
         memcpy(key.data, data + kv_pairs_cursor + 1, key.length);
         if (key.length != 0) {
-            this->keys.emplace_back(key);
+            keys.emplace_back(key);
         }
 
         kv_pairs_cursor += sizeof(key.length) + key.length;
-        if (this->is_leaf) {
+        if (is_leaf) {
             RID rid;
             rid.pid = decode_uint32(data + kv_pairs_cursor);
             rid.slot_num = decode_uint32(data + kv_pairs_cursor + sizeof(rid.pid));
             if (key.length != 0) {
-                LEAF_RECORDS(this->records).emplace_back(rid);
+                LEAF_RECORDS(records).emplace_back(rid);
             }
             kv_pairs_cursor += RID_SIZE;
         } else {
             if (key.length != 0) {
-                INTERNAL_CHILDREN(this->children).emplace_back(decode_uint32(data + kv_pairs_cursor));
+                INTERNAL_CHILDREN(children).emplace_back(decode_uint32(data + kv_pairs_cursor));
             }
             kv_pairs_cursor += TREE_KV_PTR_SIZE;
         }
@@ -122,7 +123,7 @@ TREE_NODE_FUNC_TYPE void BTreePage::insertIntoNode(const BTreeKey &key, VAL_T va
     // New key is smaller (or equal) than all current ones
     else if (cmpKeys(key.data, first_key.data, key.length, first_key.length) <= 0) {
         std::vector<BTreeKey> new_keys;
-        new_keys.reserve(size);
+        new_keys.reserve(size + 1);
         new_keys.push_back(key);
         new_keys.insert(new_keys.end(), keys.begin(), keys.end() - 1);
         keys = new_keys;
@@ -163,7 +164,6 @@ TREE_NODE_FUNC_TYPE void BTreePage::insertIntoNode(const BTreeKey &key, VAL_T va
         records = node_values;
     else
         children = node_values;
-    return;
 }
 
 template void BTreePage::insertIntoNode<RID>(const BTreeKey &, RID);

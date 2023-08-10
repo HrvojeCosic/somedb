@@ -20,28 +20,37 @@ u8 *BTree::serialize() const {
 
     encode_uint32(this->magic_num, data + MAGIC_NUMBER_OFFSET);
     encode_uint16(this->node_count, data + NODE_COUNT_OFFSET);
+    encode_uint32(this->root_pid, data + CURR_ROOT_PID_OFFSET);
     memcpy(data + MAX_KEYSIZE_OFFSET, &this->max_size, sizeof(u8));
 
     return data;
 }
 
-BTree::BTree(u8 data[PAGE_SIZE], BufferPoolManager *bpm)
-    : magic_num(decode_uint32(data)), max_size(*(data + MAX_KEYSIZE_OFFSET)), bpm(bpm) {
-    this->node_count = decode_uint16(data + NODE_COUNT_OFFSET);
-    this->root_pid = decode_uint32(data + CURR_ROOT_PID_OFFSET);
+void BTree::deserialize() {
+    u8 *metadata = read_page(BTREE_METADATA_PAGE_ID, bpm->disk_manager);
+
+    magic_num = decode_uint32(metadata + MAGIC_NUMBER_OFFSET);
+    assert(magic_num == BTREE_INDEX);
+    node_count = decode_uint16(metadata + NODE_COUNT_OFFSET);
+    root_pid = decode_uint32(metadata + CURR_ROOT_PID_OFFSET);
+    max_size = *(metadata + MAX_KEYSIZE_OFFSET);
 }
 
-bool BTree::insert(const BTreeKey &key, const RID &val) {
-    auto breadcrumbs = std::stack<BREADCRUMB_TYPE>();
+page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
+    if (root_pid <= BTREE_METADATA_PAGE_ID) {
+        root_pid = new_btree_index_page(bpm->disk_manager);
+        assert(root_pid != BTREE_METADATA_PAGE_ID);
+    }
 
+    auto breadcrumbs = std::stack<BREADCRUMB_TYPE>();
     page_id_t leaf_pid = 0;
     auto leaf = findLeaf(key, breadcrumbs, &leaf_pid);
-    assert(leaf_pid != 0);
+    assert(leaf_pid != BTREE_METADATA_PAGE_ID);
 
     // return early if duplicate key
     for (BTreeKey leaf_key : leaf->keys)
         if (BTreePage::cmpKeys(leaf_key.data, key.data, leaf_key.length, key.length) == 0)
-            return false;
+            return 0;
 
     leaf->insertIntoNode<RID>(key, val);
 
@@ -52,8 +61,13 @@ bool BTree::insert(const BTreeKey &key, const RID &val) {
             throw std::runtime_error("NON-ROOT SPLITS NOT YET IMPLEMENTED"); // TODO
     }
 
-    write_page(leaf_pid, bpm->disk_manager, leaf->serialize());
-    return true;
+    auto bpm_leaf = fetch_bpm_page(leaf_pid, bpm);
+    frame_id_t *bpm_fid =
+        static_cast<frame_id_t *>(hash_find(std::to_string(bpm_leaf->id).data(), bpm->page_table)->data);
+    write_to_frame(*bpm_fid, leaf->serialize(), bpm);
+    flush_page(bpm_leaf->id, bpm);
+
+    return leaf_pid;
 }
 
 void BTree::splitRootNode() {
@@ -83,6 +97,7 @@ void BTree::splitRootNode() {
     root_pid = new_root_id;
 
     // persist all changes
+    assert(new_node_id != BTREE_METADATA_PAGE_ID && new_root_id != BTREE_METADATA_PAGE_ID);
     write_page(BTREE_METADATA_PAGE_ID, bpm->disk_manager, serialize());
     write_page(new_node_id, bpm->disk_manager, new_node->serialize());
     write_page(new_root_id, bpm->disk_manager, new_root->serialize());
@@ -121,10 +136,7 @@ BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &bre
     }
 
     breadcrumbs.push(BREADCRUMB_TYPE(temp, 1));
-
-    *found_pid =
-        *reinterpret_cast<page_id_t *>(hash_find(std::to_string(curr_bpm_page->id).data(), bpm->page_table)->data);
-    //*found_pid = curr_bpm_page->id;
+    *found_pid = curr_bpm_page->id;
     return temp;
 }
 

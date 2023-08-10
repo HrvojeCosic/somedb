@@ -84,8 +84,13 @@ page_id_t new_btree_index_page(DiskManager *disk_manager) {
 
     u16 curr_node_num = decode_uint16(metadata_page + sizeof(u32));
     u16 new_node_num = curr_node_num + 1;
-    encode_uint16(new_node_num, metadata_page);
+    encode_uint16(new_node_num, metadata_page + sizeof(u32));
+
     write_page(0, disk_manager, metadata_page);
+    write_page(new_node_num, disk_manager, calloc(PAGE_SIZE, 1));
+    u8 *metadata_page2 = read_page(0, disk_manager);
+    assert(decode_uint32(metadata_page2) == BTREE_INDEX);
+
     return new_node_num;
 }
 

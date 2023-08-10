@@ -10,6 +10,8 @@
 
 #pragma once
 #include "index_page.hpp"
+#include "shared.h"
+#include <cassert>
 
 /*
  * Type used for walking back up the tree after reaching leaf node,
@@ -35,23 +37,29 @@ using leaf_records = std::vector<RID>;
 using internal_pointers = std::vector<u32>;
 
 struct BTree {
-    const u32 magic_num;
-    const u8 max_size;
+    u32 magic_num;
+    u8 max_size;
     BufferPoolManager *bpm;
     page_id_t root_pid;
     u16 node_count;
+
     //--------------------------------------------------------------------------------------------------------------------------------
-    BTree(u8 data[PAGE_SIZE], BufferPoolManager *bpm);
+    BTree(BufferPoolManager *bpm) : bpm(bpm) { assert(bpm->disk_manager != nullptr); }
 
     u8 *serialize() const;
 
+    void deserialize();
+
     bool getValues(const BTreeKey &key, std::vector<RID> &result);
 
-    /* Insert element into the tree and return true if successful, or false if provided key already exists */
-    bool insert(const BTreeKey &key, const RID &val);
+    // Insert element into the tree and returns page id of leaf the element is inserted in if successful, or 0 if
+    // provided key already exists
+    page_id_t insert(const BTreeKey &key, const RID &val);
 
     //--------------------------------------------------------------------------------------------------------------------------------
   private:
+    void initializeTree();
+
     BTreePage *findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs, page_id_t *found_pid);
 
     void splitRootNode();

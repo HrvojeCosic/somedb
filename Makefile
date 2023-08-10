@@ -9,6 +9,7 @@ BUILD_DIR=   build
 CXX=         g++
 OPT=         -O0
 CPP_VER=     -std=c++20
+DBFILES_DIR= db_files
 
 #=================================================================================================================
 #### FLAGS & FILES
@@ -75,7 +76,7 @@ $(TEST_DIR)/bin:
 #### GIT & CLEANUP
 #=================================================================================================================
 clean:
-	rm -rf $(BINARY) $(BUILD_DIR) $(OFILES) $(DEPFILES) $(TESTBINS)
+	rm -rf $(BINARY) $(BUILD_DIR) $(OFILES) $(DEPFILES) $(TESTBINS) $(DBFILES_DIR)
 
 diff:
 	$(shell find . -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' -o -iname '*.hpp' | xargs clang-format -i)
