@@ -95,7 +95,7 @@ BpmPage *allocate_new_page(BufferPoolManager *bpm, PageType type) {
         pid = new_heap_page(bpm->disk_manager);
         break;
     case BTREE_INDEX_PAGE:
-        pid = new_btree_index_page(bpm->disk_manager);
+        pid = new_btree_index_page(bpm->disk_manager, false);
         break;
     case INVALID:
         assert(type != INVALID); // "throw" error

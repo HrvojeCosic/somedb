@@ -78,18 +78,18 @@ void remove_table(const char *table_name) {
 // (so I don't have to deal with linking complications that would arise in test files from declaring these in index.cpp)
 // probably solve this properly if there are more issues like this in the future, but this will do for now
 //-------------------------------------------------------------------------------------------------
-page_id_t new_btree_index_page(DiskManager *disk_manager) {
+page_id_t new_btree_index_page(DiskManager *disk_manager, bool is_leaf) {
     u8 *metadata_page = read_page(0, disk_manager);
     assert(decode_uint32(metadata_page) == BTREE_INDEX);
 
-    u16 curr_node_num = decode_uint16(metadata_page + sizeof(u32));
+    u16 curr_node_num = decode_uint16(metadata_page + NODE_COUNT_OFFSET);
     u16 new_node_num = curr_node_num + 1;
-    encode_uint16(new_node_num, metadata_page + sizeof(u32));
-
+    encode_uint16(new_node_num, metadata_page + NODE_COUNT_OFFSET);
     write_page(0, disk_manager, metadata_page);
-    write_page(new_node_num, disk_manager, calloc(PAGE_SIZE, 1));
-    u8 *metadata_page2 = read_page(0, disk_manager);
-    assert(decode_uint32(metadata_page2) == BTREE_INDEX);
+
+    u8 *page = (u8 *)calloc(PAGE_SIZE, 1);
+    memcpy(page + IS_LEAF_OFFSET, &is_leaf, IS_LEAF_SIZE);
+    write_page(new_node_num, disk_manager, page);
 
     return new_node_num;
 }

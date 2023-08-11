@@ -40,5 +40,5 @@ void remove_table(const char *table_name);
 void close_table_file(char *table_name);
 
 /* See comment in source file about these btree methods */
-page_id_t new_btree_index_page(DiskManager *disk_manager);
+page_id_t new_btree_index_page(DiskManager *disk_manager, bool is_leaf);
 DiskManager *create_btree_index(const char *idx_name, const u8 max_keys);

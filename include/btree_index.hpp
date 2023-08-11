@@ -20,17 +20,6 @@
  */
 #define BREADCRUMB_TYPE std::pair<BTreePage *, int>
 
-/* Serialization sizes and offsets */
-#define BTREE_METADATA_PAGE_ID 0
-#define MAGIC_NUM_SIZE 4
-#define MAGIC_NUMBER_OFFSET 0
-#define NODE_COUNT_SIZE 2
-#define NODE_COUNT_OFFSET MAGIC_NUM_SIZE
-#define MAX_KEYSIZE_SIZE 1
-#define MAX_KEYSIZE_OFFSET MAGIC_NUM_SIZE + NODE_COUNT_SIZE
-#define CURR_ROOT_PID_SIZE 4
-#define CURR_ROOT_PID_OFFSET MAGIC_NUM_SIZE + NODE_COUNT_SIZE + MAX_KEYSIZE_SIZE
-
 namespace somedb {
 
 using leaf_records = std::vector<RID>;
@@ -62,7 +51,9 @@ struct BTree {
 
     BTreePage *findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs, page_id_t *found_pid);
 
-    void splitRootNode();
+    inline void flush_node(page_id_t node_pid, u8 *data);
+
+    void splitRootNode(BTreePage *curr_root);
     //--------------------------------------------------------------------------------------------------------------------------------
 };
 

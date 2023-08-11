@@ -6,9 +6,10 @@
  *  (16 bit uint) page offset to the end of available space
  *  (32 bit uint) page id of previous (sibling) page
  *  (32 bit uint) page id of next (sibling) page
- *  (32 bit uint) page id of rightmost pointer (set to 0 for leaf nodes, which is a way of identifying leafs)
+ *  (32 bit uint) page id of rightmost pointer (0 if none)
  *  (16 bit uint) node's level in the tree (0 for root)
  *  (8 bit uint) special page header flags
+ *  (8 bit uint) is_leaf boolean
  *
  *  Key-value pair pointers consists of:
  *  -16 bit unsigned integer representing the page offset to the corresponding kv pair
@@ -25,6 +26,7 @@
 #include <variant>
 #include <vector>
 
+#include "./serialize.h"
 #include "./shared.h"
 #include "disk_manager.h"
 
@@ -36,35 +38,13 @@
 #define LEAF_RECORDS(records) std::get<std::vector<RID>>(records)
 #define INTERNAL_CHILDREN(children) std::get<std::vector<u32>>(children)
 
-/* Serialization sizes and offsets */
-#define TREE_KV_PTR_SIZE 4
-#define AVAILABLE_SPACE_START_SIZE 2
-#define AVAILABLE_SPACE_START_OFFSET 0
-#define AVAILABLE_SPACE_END_SIZE 2
-#define AVAILABLE_SPACE_END_OFFSET AVAILABLE_SPACE_START_OFFSET + AVAILABLE_SPACE_START_SIZE
-#define PREVIOUS_PID_SIZE 4
-#define PREVIOUS_PID_OFFSET AVAILABLE_SPACE_END_OFFSET + AVAILABLE_SPACE_END_SIZE
-#define NEXT_PID_SIZE 4
-#define NEXT_PID_OFFSET PREVIOUS_PID_OFFSET + PREVIOUS_PID_SIZE
-#define RIGHTMOST_PID_SIZE 4
-#define RIGHTMOST_PID_OFFSET NEXT_PID_OFFSET + NEXT_PID_SIZE
-#define TREE_LEVEL_SIZE 2
-#define TREE_LEVEL_OFFSET RIGHTMOST_PID_OFFSET + RIGHTMOST_PID_SIZE
-#define TREE_FLAGS_SIZE 1
-#define TREE_FLAGS_OFFSET TREE_LEVEL_OFFSET + TREE_LEVEL_SIZE
-#define INDEX_PAGE_HEADER_SIZE                                                                                         \
-    AVAILABLE_SPACE_START_SIZE + AVAILABLE_SPACE_END_SIZE + PREVIOUS_PID_SIZE + NEXT_PID_SIZE + RIGHTMOST_PID_SIZE +   \
-        TREE_LEVEL_SIZE + TREE_FLAGS_SIZE
-#define IS_LEAF_SIZE 1
-#define IS_LEAF_OFFSET RIGHTMOST_PID_OFFSET
-
 namespace somedb {
 
 using leaf_records = std::vector<RID>;
 using internal_pointers = std::vector<u32>;
 
 struct BTreePage {
-    const bool is_leaf;
+    bool is_leaf;
     u16 level; // starting from 0
     std::vector<BTreeKey> keys;
     u8 flags;
@@ -76,16 +56,16 @@ struct BTreePage {
     page_id_t next;
 
     /* Depending on node type, store record ids of tuples (leaf) or pointers to descendants (internal). */
-    std::variant<std::vector<RID>, std::vector<u32>> records, children;
+    std::variant<std::vector<RID>, std::vector<u32>> values;
     //--------------------------------------------------------------------------------------------------------------------------------
     BTreePage(u8 data[PAGE_SIZE]);
-    BTreePage(bool is_leaf) : is_leaf(is_leaf){};
+    BTreePage(bool is_leaf);
     ~BTreePage();
     //--------------------------------------------------------------------------------------------------------------------------------
     u8 *serialize() const;
 
     /* From page bytes, determine if the page is of leaf type*/
-    inline bool get_is_leaf(u8 data[PAGE_SIZE]) { return *(data + IS_LEAF_OFFSET) == 0; }
+    inline bool get_is_leaf(u8 data[PAGE_SIZE]) { return *(data + IS_LEAF_OFFSET) == true; }
 
     /* If first key is bigger return >0, if second is bigger return <0, if equal return 0 */
     inline static int cmpKeys(const u8 *key1, const u8 *key2, u16 len1, u16 len2) {

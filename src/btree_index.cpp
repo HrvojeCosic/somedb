@@ -38,8 +38,9 @@ void BTree::deserialize() {
 
 page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
     if (root_pid <= BTREE_METADATA_PAGE_ID) {
-        root_pid = new_btree_index_page(bpm->disk_manager);
+        root_pid = new_btree_index_page(bpm->disk_manager, true);
         assert(root_pid != BTREE_METADATA_PAGE_ID);
+        node_count++;
     }
 
     auto breadcrumbs = std::stack<BREADCRUMB_TYPE>();
@@ -56,7 +57,7 @@ page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
 
     if (this->max_size < leaf->keys.size()) {
         if (leaf->level == 0)
-            splitRootNode();
+            splitRootNode(leaf);
         else
             throw std::runtime_error("NON-ROOT SPLITS NOT YET IMPLEMENTED"); // TODO
     }
@@ -70,37 +71,45 @@ page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
     return leaf_pid;
 }
 
-void BTree::splitRootNode() {
-    auto old_root_node = std::make_unique<BTreePage>(fetch_bpm_page(root_pid, bpm)->data);
+inline void BTree::flush_node(page_id_t node_pid, u8 *data) {
+    auto bpm_page = fetch_bpm_page(node_pid, bpm);
+    frame_id_t *fid = static_cast<frame_id_t *>(hash_find(std::to_string(bpm_page->id).data(), bpm->page_table)->data);
+    write_to_frame(*fid, data, bpm);
+    flush_page(node_pid, bpm);
+}
+
+void BTree::splitRootNode(BTreePage *old_root_node) {
+    assert(root_pid != BTREE_METADATA_PAGE_ID);
 
     auto mid_key = old_root_node->keys.at(old_root_node->keys.size() / 2);
 
-    auto new_node = std::make_unique<BTreePage>(false);
-    auto new_root = std::make_unique<BTreePage>(true);
-    page_id_t new_node_id = ++node_count;
-    page_id_t new_root_id = ++node_count;
+    auto new_node_id = new_btree_index_page(bpm->disk_manager, true);
+    auto new_root_id = new_btree_index_page(bpm->disk_manager, false);
+    auto new_node = new BTreePage(true);
+    auto new_root = new BTreePage(false);
+    node_count += 2;
 
     // redistribute keys/values between old and new root node
     new_node->keys = BTreePage::vec_second_half<BTreeKey>(old_root_node->keys);
     old_root_node->keys = BTreePage::vec_first_half(old_root_node->keys);
-    auto full = LEAF_RECORDS(old_root_node->records);
-    new_node->records = BTreePage::vec_second_half<RID>(full);
-    old_root_node->records = BTreePage::vec_first_half<RID>(full);
+    auto full = LEAF_RECORDS(old_root_node->values);
+    new_node->values = BTreePage::vec_second_half<RID>(full);
+    old_root_node->values = BTreePage::vec_first_half<RID>(full);
 
     new_node->previous = root_pid;
     old_root_node->next = new_node_id;
 
     // create new root and connect nodes to it
     new_root->keys.insert(new_root->keys.begin(), mid_key);
-    INTERNAL_CHILDREN(new_root->children).insert(INTERNAL_CHILDREN(new_root->children).begin(), root_pid);
-    INTERNAL_CHILDREN(new_root->children).insert(INTERNAL_CHILDREN(new_root->children).begin() + 1, new_node_id);
+    INTERNAL_CHILDREN(new_root->values).insert(INTERNAL_CHILDREN(new_root->values).begin(), root_pid);
+    INTERNAL_CHILDREN(new_root->values).insert(INTERNAL_CHILDREN(new_root->values).begin() + 1, new_node_id);
     root_pid = new_root_id;
 
     // persist all changes
     assert(new_node_id != BTREE_METADATA_PAGE_ID && new_root_id != BTREE_METADATA_PAGE_ID);
-    write_page(BTREE_METADATA_PAGE_ID, bpm->disk_manager, serialize());
-    write_page(new_node_id, bpm->disk_manager, new_node->serialize());
-    write_page(new_root_id, bpm->disk_manager, new_root->serialize());
+    flush_node(BTREE_METADATA_PAGE_ID, serialize());
+    flush_node(new_node_id, new_node->serialize());
+    flush_node(new_root_id, new_root->serialize());
 }
 
 BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs, page_id_t *found_pid) {
@@ -112,7 +121,7 @@ BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &bre
         auto first_key = temp->keys[0];
         if (BTreePage::cmpKeys(first_key.data, key.data, first_key.length, key.length) < 0) {
             breadcrumbs.push(BREADCRUMB_TYPE(temp, 0));
-            auto next_ptr = std::get<internal_pointers>(temp->children).at(0);
+            auto next_ptr = std::get<internal_pointers>(temp->values).at(0);
             curr_bpm_page = fetch_bpm_page(next_ptr, bpm);
             temp = new BTreePage(curr_bpm_page->data); // TODO: FIX LEAK
             continue;
@@ -123,7 +132,7 @@ BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &bre
             if (BTreePage::cmpKeys(prev_key.data, key.data, prev_key.length, key.length) > 0 &&
                 BTreePage::cmpKeys(curr_key.data, key.data, curr_key.length, key.length) <= 0) {
                 breadcrumbs.push(BREADCRUMB_TYPE(temp, i));
-                auto next_ptr = std::get<internal_pointers>(temp->children).at(i);
+                auto next_ptr = std::get<internal_pointers>(temp->values).at(i);
                 curr_bpm_page = fetch_bpm_page(next_ptr, bpm);
                 temp = new BTreePage(curr_bpm_page->data); // TODO: FIX LEAK
                 continue;

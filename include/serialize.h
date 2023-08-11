@@ -1,7 +1,44 @@
 #include <stdint.h>
 
+//--------------------------------/* Serialization sizes and offsets */--------------------------------
+// BTree index page:
+#define TREE_KV_PTR_SIZE 4
+#define AVAILABLE_SPACE_START_SIZE 2
+#define AVAILABLE_SPACE_START_OFFSET 0
+#define AVAILABLE_SPACE_END_SIZE 2
+#define AVAILABLE_SPACE_END_OFFSET AVAILABLE_SPACE_START_OFFSET + AVAILABLE_SPACE_START_SIZE
+#define PREVIOUS_PID_SIZE 4
+#define PREVIOUS_PID_OFFSET AVAILABLE_SPACE_END_OFFSET + AVAILABLE_SPACE_END_SIZE
+#define NEXT_PID_SIZE 4
+#define NEXT_PID_OFFSET PREVIOUS_PID_OFFSET + PREVIOUS_PID_SIZE
+#define RIGHTMOST_PID_SIZE 4
+#define RIGHTMOST_PID_OFFSET NEXT_PID_OFFSET + NEXT_PID_SIZE
+#define TREE_LEVEL_SIZE 2
+#define TREE_LEVEL_OFFSET RIGHTMOST_PID_OFFSET + RIGHTMOST_PID_SIZE
+#define TREE_FLAGS_SIZE 1
+#define TREE_FLAGS_OFFSET TREE_LEVEL_OFFSET + TREE_LEVEL_SIZE
+#define IS_LEAF_SIZE 1
+#define IS_LEAF_OFFSET TREE_FLAGS_OFFSET + TREE_FLAGS_SIZE
+#define INDEX_PAGE_HEADER_SIZE                                                                                         \
+    AVAILABLE_SPACE_START_SIZE + AVAILABLE_SPACE_END_SIZE + PREVIOUS_PID_SIZE + NEXT_PID_SIZE + RIGHTMOST_PID_SIZE +   \
+        TREE_LEVEL_SIZE + TREE_FLAGS_SIZE + IS_LEAF_OFFSET
+
+// BTree metadata page:
+#define BTREE_METADATA_PAGE_ID 0
+#define MAGIC_NUM_SIZE 4
+#define MAGIC_NUMBER_OFFSET 0
+#define NODE_COUNT_SIZE 2
+#define NODE_COUNT_OFFSET MAGIC_NUM_SIZE
+#define MAX_KEYSIZE_SIZE 1
+#define MAX_KEYSIZE_OFFSET MAGIC_NUM_SIZE + NODE_COUNT_SIZE
+#define CURR_ROOT_PID_SIZE 4
+#define CURR_ROOT_PID_OFFSET MAGIC_NUM_SIZE + NODE_COUNT_SIZE + MAX_KEYSIZE_SIZE
+
+// Heap file (TODO)
+//------------------------------------------------------------------------------------------------------
+
 /**
- * Header file containing encoding/decoding functions for serializing data used to persist it on disk
+ * encoding/decoding functions for serializing data used to persist it on disk
  *
  * Serialization formats:
  * uint32 - big endian binary format
