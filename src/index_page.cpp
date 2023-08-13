@@ -94,28 +94,29 @@ BTreePage::BTreePage(u8 data[PAGE_SIZE]) {
 
     u16 kv_pairs_cursor = decode_uint16(data + AVAILABLE_SPACE_END_OFFSET);
     while (kv_pairs_cursor < PAGE_SIZE) {
-        BTreeKey key = {.data = 0, .length = 0};
-        key.length = *(data + kv_pairs_cursor);
-        key.data = new u8[key.length];
-        memcpy(key.data, data + kv_pairs_cursor + 1, key.length);
-        if (key.length != 0) {
-            keys.emplace_back(key);
+        u8 curr_key_len = *(data + kv_pairs_cursor);
+
+        // skip the empty kv slots
+        if (curr_key_len == 0) {
+            is_leaf ? kv_pairs_cursor += RID_SIZE : TREE_KV_PTR_SIZE;
+            continue;
         }
 
+        BTreeKey key = {.data = 0, .length = curr_key_len};
+        key.data = new u8[key.length];
+        memcpy(key.data, data + kv_pairs_cursor + 1, key.length);
+
         kv_pairs_cursor += sizeof(key.length) + key.length;
+        keys.emplace_back(key);
 
         if (is_leaf) {
             RID rid;
             rid.pid = decode_uint32(data + kv_pairs_cursor);
             rid.slot_num = decode_uint32(data + kv_pairs_cursor + sizeof(rid.pid));
-            if (key.length != 0) {
-                LEAF_RECORDS(values).emplace_back(rid);
-            }
+            LEAF_RECORDS(values).emplace_back(rid);
             kv_pairs_cursor += RID_SIZE;
         } else {
-            if (key.length != 0) {
-                INTERNAL_CHILDREN(values).emplace_back(decode_uint32(data + kv_pairs_cursor));
-            }
+            INTERNAL_CHILDREN(values).emplace_back(decode_uint32(data + kv_pairs_cursor));
             kv_pairs_cursor += TREE_KV_PTR_SIZE;
         }
     }

@@ -58,8 +58,11 @@ struct BTreePage {
     /* Depending on node type, store record ids of tuples (leaf) or pointers to descendants (internal). */
     std::variant<std::vector<RID>, std::vector<u32>> values;
     //--------------------------------------------------------------------------------------------------------------------------------
+    /* Deserialize given page data into a BTreePage instance */
     BTreePage(u8 data[PAGE_SIZE]);
+
     BTreePage(bool is_leaf);
+
     ~BTreePage();
     //--------------------------------------------------------------------------------------------------------------------------------
     u8 *serialize() const;
