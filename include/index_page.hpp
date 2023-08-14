@@ -6,8 +6,7 @@
  *  (16 bit uint) page offset to the end of available space
  *  (32 bit uint) page id of previous (sibling) page
  *  (32 bit uint) page id of next (sibling) page
- *  (32 bit uint) page id of rightmost pointer (0 if none)
- *  (16 bit uint) node's level in the tree (0 for root)
+ *  (32 bit uint) page id of rightmost pointer (0 if none (only if page is leaf or there is one value in internal page))
  *  (8 bit uint) special page header flags
  *  (8 bit uint) is_leaf boolean
  *
@@ -45,14 +44,11 @@ using internal_pointers = std::vector<u32>;
 
 struct BTreePage {
     bool is_leaf;
-    u16 level; // starting from 0
     std::vector<BTreeKey> keys;
     u8 flags;
-    page_id_t rightmost_ptr;
 
-    // Tracking siblings for sequential scan across leaf nodes.
-    // only storing their file offsets so it's not necessary to load them from disk before referencing them
-    page_id_t previous;
+    // only storing file offsets of connected nodes so it's not necessary to load them from disk before referencing them
+    page_id_t rightmost_ptr;
     page_id_t next;
 
     /* Depending on node type, store record ids of tuples (leaf) or pointers to descendants (internal). */

@@ -15,10 +15,10 @@
 
 /*
  * Type used for walking back up the tree after reaching leaf node,
- * containing parent pointer and index in pointer array
+ * containing parent pointer(on disk representation) and index in pointer array
  * index is -1 if the node was pointed to by the rightmost_ptr of the parent
  */
-#define BREADCRUMB_TYPE std::pair<BTreePage *, int>
+#define BREADCRUMB_TYPE std::pair<page_id_t, int>
 
 namespace somedb {
 
@@ -41,7 +41,7 @@ struct BTree {
 
     bool getValues(const BTreeKey &key, std::vector<RID> &result);
 
-    // Insert element into the tree and returns page id of leaf the element is inserted in if successful, or 0 if
+    // Inserts element into the tree and returns page id of leaf the element is inserted in if successful, or 0 if
     // provided key already exists
     page_id_t insert(const BTreeKey &key, const RID &val);
 
@@ -53,7 +53,12 @@ struct BTree {
 
     inline void flush_node(page_id_t node_pid, u8 *data);
 
+    // Splits provided root node and creates a new tree root
     void splitRootNode(BTreePage *curr_root);
+
+    // Splits provided leaf node and propagates the split up the tree if necessary
+    void splitLeafNode(BTreePage *old_leaf_node, const page_id_t old_leaf_pid,
+                       std::stack<BREADCRUMB_TYPE> &breadcrumbs);
     //--------------------------------------------------------------------------------------------------------------------------------
 };
 

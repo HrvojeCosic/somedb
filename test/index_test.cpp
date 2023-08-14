@@ -49,7 +49,6 @@ TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeNode) {
     auto page = new BTreePage(true);
     page->rightmost_ptr = 0;
     page->next = 256;
-    page->previous = 64;
     RID rids[] = {{.pid = 1, .slot_num = 3}, {.pid = 2, .slot_num = 4}, {.pid = 3, .slot_num = 5}};
     std::string keys_data[] = {"key", "key1", "key82"};
 
@@ -74,17 +73,14 @@ TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeNode) {
     EXPECT_EQ(decode_uint16(serialized + AVAILABLE_SPACE_START_OFFSET),
               INDEX_PAGE_HEADER_SIZE + (TREE_KV_PTR_SIZE * num_pairs));
     EXPECT_EQ(decode_uint16(serialized + AVAILABLE_SPACE_END_SIZE), PAGE_SIZE - (24 + 3 + 12));
-    EXPECT_EQ(decode_uint32(serialized + PREVIOUS_PID_OFFSET), page->previous);
     EXPECT_EQ(decode_uint32(serialized + NEXT_PID_OFFSET), page->next);
     EXPECT_EQ(decode_uint32(serialized + RIGHTMOST_PID_OFFSET), page->rightmost_ptr);
-    EXPECT_EQ(decode_uint16(serialized + TREE_LEVEL_OFFSET), page->level);
     EXPECT_EQ(*(serialized + TREE_FLAGS_OFFSET), page->flags);
 
     // deserialize into BTreePage
     auto page_deserialized = new BTreePage(serialized);
     EXPECT_EQ(page_deserialized->rightmost_ptr, page->rightmost_ptr);
     EXPECT_EQ(page_deserialized->is_leaf, page->is_leaf);
-    EXPECT_EQ(page_deserialized->previous, page->previous);
     EXPECT_EQ(page_deserialized->next, page->next);
     for (u8 i = 0; i < page_deserialized->keys.size(); i++) {
         // compare keys as they were added to keys read from end of page, same for values
@@ -130,21 +126,21 @@ TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
     EXPECT_EQ(LEAF_RECORDS(leaf->values).at(1).pid, val1.pid);
 }
 
-TEST_F(IndexTestFixture, InsertTest_FullRoot) {
+TEST_F(IndexTestFixture, InsertTest_Splits) {
     auto tree = new BTree(bpm);
     tree->deserialize();
-    RID vals[] = {{.pid = 1, .slot_num = 2},
-                  {.pid = 3, .slot_num = 4},
-                  {.pid = 5, .slot_num = 6},
-                  {.pid = 7, .slot_num = 8},
-                  {.pid = 9, .slot_num = 10}};
-    std::string keys_data[] = {"A", "B", "D", "E", "C"};
+    RID vals[] = {{.pid = 1, .slot_num = 2},  {.pid = 3, .slot_num = 4},  {.pid = 5, .slot_num = 6},
+                  {.pid = 7, .slot_num = 8},  {.pid = 9, .slot_num = 10}, {.pid = 11, .slot_num = 12},
+                  {.pid = 13, .slot_num = 14}};
+    std::string keys_data[] = {"A", "B", "D", "E", "C", "F", "G"};
     BTreeKey keys[] = {
         {reinterpret_cast<u8 *>(keys_data[0].data()), static_cast<u8>(keys_data[0].length())},
         {reinterpret_cast<u8 *>(keys_data[1].data()), static_cast<u8>(keys_data[1].length())},
         {reinterpret_cast<u8 *>(keys_data[2].data()), static_cast<u8>(keys_data[2].length())},
         {reinterpret_cast<u8 *>(keys_data[3].data()), static_cast<u8>(keys_data[3].length())},
         {reinterpret_cast<u8 *>(keys_data[4].data()), static_cast<u8>(keys_data[4].length())},
+        {reinterpret_cast<u8 *>(keys_data[5].data()), static_cast<u8>(keys_data[5].length())},
+        {reinterpret_cast<u8 *>(keys_data[6].data()), static_cast<u8>(keys_data[6].length())},
     };
 
     auto leaf_pid1 = tree->insert(keys[0], vals[0]);
@@ -161,7 +157,7 @@ TEST_F(IndexTestFixture, InsertTest_FullRoot) {
     EXPECT_EQ(ok, false);
     EXPECT_EQ(curr_root->keys.size(), pre_size);
 
-    // Test node split
+    // Test root node split
     tree->insert(keys[4], vals[4]);
     curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
     auto old_root = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(0), tree->bpm)->data);
@@ -172,6 +168,24 @@ TEST_F(IndexTestFixture, InsertTest_FullRoot) {
     std::vector<BTreeKey> right_node_keys = {keys[4], keys[2], keys[3]}; // C D E
     EXPECT_EQ(old_root->keys == left_node_keys, true);
     EXPECT_EQ(new_child->keys == right_node_keys, true);
+
+    // Test leaf node split
+    tree->insert(keys[5], vals[5]);
+    tree->insert(keys[6], vals[6]);
+    curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
+    EXPECT_EQ(curr_root->keys.at(0), keys[4]); // C
+    EXPECT_EQ(curr_root->keys.at(1), keys[3]); // E
+    auto left_node = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(0), tree->bpm)->data);
+    auto mid_node = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(1), tree->bpm)->data);
+    EXPECT_EQ(INTERNAL_CHILDREN(curr_root->values).size(), 2);
+    EXPECT_EQ(curr_root->rightmost_ptr != 0, true);
+    auto right_node = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
+    left_node_keys = left_node_keys;
+    std::vector<BTreeKey> mid_node_keys = {keys[4], keys[2]}; // C D
+    right_node_keys = {keys[3], keys[5], keys[6]};            // E F G
+    EXPECT_EQ(left_node->keys == left_node_keys, true);
+    EXPECT_EQ(mid_node->keys == mid_node_keys, true);
+    EXPECT_EQ(right_node->keys == right_node_keys, true);
 }
 
 int main(int argc, char **argv) {

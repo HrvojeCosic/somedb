@@ -63,16 +63,10 @@ u8 *BTreePage::serialize() const {
         i--;
     }
 
-    // encode the only value without its corresponding key as a rightmost pointer
-    if (!is_leaf)
-        encode_uint32(INTERNAL_CHILDREN(values).back(), data + RIGHTMOST_PID_OFFSET);
-
     encode_uint16(available_space_start, data + AVAILABLE_SPACE_START_OFFSET);
     encode_uint16(available_space_end, data + AVAILABLE_SPACE_END_OFFSET);
-    encode_uint32(previous, data + PREVIOUS_PID_OFFSET);
     encode_uint32(next, data + NEXT_PID_OFFSET);
-    encode_uint16(rightmost_ptr, data + RIGHTMOST_PID_OFFSET);
-    encode_uint16(level, data + TREE_LEVEL_OFFSET);
+    encode_uint32(rightmost_ptr, data + RIGHTMOST_PID_OFFSET);
     memcpy(data + TREE_FLAGS_OFFSET, &flags, TREE_FLAGS_SIZE);
     memcpy(data + IS_LEAF_OFFSET, &is_leaf, IS_LEAF_SIZE);
 
@@ -80,10 +74,8 @@ u8 *BTreePage::serialize() const {
 }
 
 BTreePage::BTreePage(u8 data[PAGE_SIZE]) {
-    previous = decode_uint32(data + PREVIOUS_PID_OFFSET);
     next = decode_uint32(data + NEXT_PID_OFFSET);
     rightmost_ptr = decode_uint32(data + RIGHTMOST_PID_OFFSET);
-    level = decode_uint16(data + TREE_LEVEL_OFFSET);
     memcpy(&flags, data + TREE_FLAGS_OFFSET, TREE_FLAGS_SIZE);
     memcpy(&is_leaf, data + IS_LEAF_OFFSET, IS_LEAF_SIZE);
 
@@ -124,6 +116,7 @@ BTreePage::BTreePage(u8 data[PAGE_SIZE]) {
 
 TREE_NODE_FUNC_TYPE void BTreePage::insertIntoNode(const BTreeKey &key, VAL_T val) {
     std::vector<VAL_T> node_values;
+
     if constexpr (std::is_same_v<VAL_T, RID>)
         node_values = LEAF_RECORDS(values);
     else
