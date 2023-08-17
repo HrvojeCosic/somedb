@@ -18,10 +18,10 @@ namespace somedb {
 u8 *BTree::serialize() const {
     u8 *data = new u8[PAGE_SIZE];
 
-    encode_uint32(this->magic_num, data + MAGIC_NUMBER_OFFSET);
-    encode_uint16(this->node_count, data + NODE_COUNT_OFFSET);
-    encode_uint32(this->root_pid, data + CURR_ROOT_PID_OFFSET);
-    memcpy(data + MAX_KEYSIZE_OFFSET, &this->max_size, sizeof(u8));
+    encode_uint32(magic_num, data + MAGIC_NUMBER_OFFSET);
+    encode_uint16(node_count, data + NODE_COUNT_OFFSET);
+    encode_uint32(root_pid, data + CURR_ROOT_PID_OFFSET);
+    memcpy(data + MAX_KEYSIZE_OFFSET, &max_size, sizeof(u8));
 
     return data;
 }
@@ -34,13 +34,6 @@ void BTree::deserialize() {
     node_count = decode_uint16(metadata + NODE_COUNT_OFFSET);
     root_pid = decode_uint32(metadata + CURR_ROOT_PID_OFFSET);
     max_size = *(metadata + MAX_KEYSIZE_OFFSET);
-}
-
-inline void BTree::flush_node(page_id_t node_pid, u8 *data) {
-    auto bpm_page = fetch_bpm_page(node_pid, bpm);
-    frame_id_t *fid = static_cast<frame_id_t *>(hash_find(std::to_string(bpm_page->id).data(), bpm->page_table)->data);
-    write_to_frame(*fid, data, bpm);
-    flush_page(node_pid, bpm);
 }
 
 page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
@@ -62,30 +55,27 @@ page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
 
     leaf->insertIntoNode<RID>(key, val);
 
-    if (this->max_size < leaf->keys.size()) {
+    if (max_size < leaf->keys.size()) {
         assert(root_pid != BTREE_METADATA_PAGE_ID);
         if (breadcrumbs.size() == 0)
-            splitRootNode(leaf);
+            splitRootNode<RID>(*leaf);
         else
-            splitLeafNode(leaf, leaf_pid, breadcrumbs);
+            splitNonRootNode<RID>(leaf, leaf_pid, breadcrumbs);
     }
 
-    flush_node(leaf_pid, leaf->serialize());
+    flush_node(leaf_pid, leaf->serialize(), bpm);
     return leaf_pid;
 }
 
-void BTree::splitLeafNode(BTreePage *old_node, const page_id_t old_node_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
+TREE_NODE_FUNC_TYPE void BTree::splitNonRootNode(BTreePage *old_node, const page_id_t old_node_pid,
+                                                 std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
     auto mid_key = old_node->keys.at(old_node->keys.size() / 2);
+    constexpr bool is_node_leaf = std::same_as<VAL_T, RID>;
 
-    auto new_node = new BTreePage(true);
-    const page_id_t new_node_id = new_btree_index_page(bpm->disk_manager, true);
+    auto new_node = new BTreePage(is_node_leaf);
+    const page_id_t new_node_id = new_btree_index_page(bpm->disk_manager, is_node_leaf);
 
-    // redistribute (todo: pull out to a separate function and use it for splitRootNode too)
-    new_node->keys = BTreePage::vec_second_half<BTreeKey>(old_node->keys);
-    old_node->keys = BTreePage::vec_first_half(old_node->keys);
-    auto full = LEAF_RECORDS(old_node->values);
-    new_node->values = BTreePage::vec_second_half<RID>(full);
-    old_node->values = BTreePage::vec_first_half<RID>(full);
+    redistribute_kv<VAL_T>(new_node, old_node);
 
     // update sibling pointers
     new_node->next = old_node->next;
@@ -102,31 +92,38 @@ void BTree::splitLeafNode(BTreePage *old_node, const page_id_t old_node_pid, std
 
     // persist to disk
     assert(new_node_id != BTREE_METADATA_PAGE_ID && old_node_pid != BTREE_METADATA_PAGE_ID);
-    flush_node(parent_bpm_page->id, parent->serialize());
-    flush_node(new_node_id, new_node->serialize());
-    flush_node(old_node_pid, old_node->serialize());
+    flush_node(parent_bpm_page->id, parent->serialize(), bpm);
+    flush_node(new_node_id, new_node->serialize(), bpm);
+    flush_node(old_node_pid, old_node->serialize(), bpm);
 
     // call for other ascendants if necessary
-    // TODO
+    if (parent->keys.size() > max_size) {
+        if (breadcrumbs.empty()) {
+            auto test1 = fetch_bpm_page(root_pid, bpm)->data;
+            auto test = new BTreePage(test1);
+            splitRootNode<u32>(*new BTreePage(fetch_bpm_page(root_pid, bpm)->data));
+        } else {
+            page_id_t old_pid = breadcrumbs.top().first;
+            auto top = getPrevBreadcrumbPage(*parent, breadcrumbs);
+            assert(top != nullptr);
+            splitNonRootNode<u32>(top, old_pid, breadcrumbs);
+        }
+    }
 }
 
-void BTree::splitRootNode(BTreePage *old_root_node) {
-    auto mid_key = old_root_node->keys.at(old_root_node->keys.size() / 2);
+TREE_NODE_FUNC_TYPE void BTree::splitRootNode(BTreePage &old_root_node) {
+    auto mid_key = old_root_node.keys.at(old_root_node.keys.size() / 2);
+    constexpr bool is_old_root_leaf = std::same_as<VAL_T, RID>;
 
-    auto new_node_id = new_btree_index_page(bpm->disk_manager, true);
+    auto new_node_id = new_btree_index_page(bpm->disk_manager, is_old_root_leaf);
     auto new_root_id = new_btree_index_page(bpm->disk_manager, false);
-    auto new_node = new BTreePage(true);
+    auto new_node = new BTreePage(is_old_root_leaf);
     auto new_root = new BTreePage(false);
     node_count += 2;
 
-    // redistribute keys/values between old and new root node
-    new_node->keys = BTreePage::vec_second_half<BTreeKey>(old_root_node->keys);
-    old_root_node->keys = BTreePage::vec_first_half(old_root_node->keys);
-    auto full = LEAF_RECORDS(old_root_node->values);
-    new_node->values = BTreePage::vec_second_half<RID>(full);
-    old_root_node->values = BTreePage::vec_first_half<RID>(full);
+    redistribute_kv<VAL_T>(new_node, &old_root_node);
 
-    old_root_node->next = new_node_id;
+    old_root_node.next = new_node_id;
 
     // create new root and connect nodes to it
     new_root->keys.insert(new_root->keys.begin(), mid_key);
@@ -137,9 +134,9 @@ void BTree::splitRootNode(BTreePage *old_root_node) {
 
     // persist all changes
     assert(new_node_id != BTREE_METADATA_PAGE_ID && new_root_id != BTREE_METADATA_PAGE_ID);
-    flush_node(BTREE_METADATA_PAGE_ID, serialize());
-    flush_node(new_node_id, new_node->serialize());
-    flush_node(new_root_id, new_root->serialize());
+    flush_node(BTREE_METADATA_PAGE_ID, serialize(), bpm);
+    flush_node(new_node_id, new_node->serialize(), bpm);
+    flush_node(root_pid, new_root->serialize(), bpm);
 }
 
 BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs, page_id_t *found_pid) {

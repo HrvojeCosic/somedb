@@ -129,20 +129,20 @@ TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
 TEST_F(IndexTestFixture, InsertTest_Splits) {
     auto tree = new BTree(bpm);
     tree->deserialize();
-    RID vals[] = {{.pid = 1, .slot_num = 2},  {.pid = 3, .slot_num = 4},  {.pid = 5, .slot_num = 6},
-                  {.pid = 7, .slot_num = 8},  {.pid = 9, .slot_num = 10}, {.pid = 11, .slot_num = 12},
-                  {.pid = 13, .slot_num = 14}};
-    std::string keys_data[] = {"A", "B", "D", "E", "C", "F", "G"};
-    BTreeKey keys[] = {
-        {reinterpret_cast<u8 *>(keys_data[0].data()), static_cast<u8>(keys_data[0].length())},
-        {reinterpret_cast<u8 *>(keys_data[1].data()), static_cast<u8>(keys_data[1].length())},
-        {reinterpret_cast<u8 *>(keys_data[2].data()), static_cast<u8>(keys_data[2].length())},
-        {reinterpret_cast<u8 *>(keys_data[3].data()), static_cast<u8>(keys_data[3].length())},
-        {reinterpret_cast<u8 *>(keys_data[4].data()), static_cast<u8>(keys_data[4].length())},
-        {reinterpret_cast<u8 *>(keys_data[5].data()), static_cast<u8>(keys_data[5].length())},
-        {reinterpret_cast<u8 *>(keys_data[6].data()), static_cast<u8>(keys_data[6].length())},
-    };
 
+    std::string keys_data[100] = {"A", "B", "D", "E", "C", "F", "G", "H", "I", "J",
+                                  "K", "L", "M", "N", "O", "P", "Q", "R", "S"};
+    size_t keys_length = sizeof(keys_data) / sizeof(keys_data[0]);
+    BTreeKey keys[keys_length];
+    RID vals[keys_length];
+    for (u16 i = 0; i < keys_length; i++) {
+        keys[i] = {reinterpret_cast<u8 *>(keys_data[i].data()), static_cast<u8>(keys_data[i].length())};
+        const page_id_t pid = i + 1;
+        const u32 slot_num = i + 2;
+        vals[i] = {.pid = pid, .slot_num = slot_num};
+    }
+
+    // Test simple insert
     auto leaf_pid1 = tree->insert(keys[0], vals[0]);
     tree->insert(keys[1], vals[1]);
     tree->insert(keys[2], vals[2]);
@@ -186,6 +186,12 @@ TEST_F(IndexTestFixture, InsertTest_Splits) {
     EXPECT_EQ(left_node->keys == left_node_keys, true);
     EXPECT_EQ(mid_node->keys == mid_node_keys, true);
     EXPECT_EQ(right_node->keys == right_node_keys, true);
+
+    // Test internal node split
+    for (int i = 7; i < 13;
+         i++) { // (OBRISI OVO) i=12 neide, tj kad dode do M odnosno kad treba splitat leaf i onda root cvor
+        tree->insert(keys[i], vals[i]);
+    }
 }
 
 int main(int argc, char **argv) {

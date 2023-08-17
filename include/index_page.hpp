@@ -73,13 +73,17 @@ struct BTreePage {
     }
 
     /* Get the second half of the vector (useful for things like node splits) */
-    template <typename VAL_T> inline static std::vector<VAL_T> vec_second_half(std::vector<VAL_T> full_vec) {
-        return {full_vec.begin() + (full_vec.size() / 2), full_vec.end()};
+    template <typename T>
+    inline static std::vector<T> vec_second_half(std::vector<T> full_vec, bool include_mid = true) {
+        const int subtractor = include_mid ? 0 : 1;
+        return {full_vec.begin() + (full_vec.size() / 2) - subtractor, full_vec.end()};
     }
 
     /* Get the first half of the vector */
-    template <typename VAL_T> inline static std::vector<VAL_T> vec_first_half(std::vector<VAL_T> full_vec) {
-        return {full_vec.begin(), full_vec.begin() + full_vec.size() / 2};
+    template <typename T>
+    inline static std::vector<T> vec_first_half(std::vector<T> full_vec, bool include_mid = true) {
+        const int subtractor = include_mid ? 0 : 1;
+        return {full_vec.begin(), full_vec.begin() + (full_vec.size() / 2) - subtractor};
     }
 
     /*
