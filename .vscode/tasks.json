@@ -1,0 +1,26 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"test"
+			],
+		},
+		//-------------------------------------------------------------------------
+		{
+			"label": "cleanup",
+			"type": "shell",
+			"command": "${command:workbench.action.togglePanel}",
+			"dependsOn": "remove_dbdir"
+		},
+		{
+			"label": "remove_dbdir",
+			"type": "shell",
+			"command": "rm -rf db_files",
+		}
+		//-------------------------------------------------------------------------
+	]
+}
