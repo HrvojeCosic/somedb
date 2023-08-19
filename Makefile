@@ -21,10 +21,12 @@ DEPFLAGS=-MP -MD
 
 CFILES=$(wildcard $(CODEDIR)/*.c)
 CPPFILES=$(wildcard $(CODEDIR)/*.cpp)
+CPPFILES_NO_MAIN=$(filter-out $(CODEDIR)/main.cpp,$(CPPFILES))
+CFILES_NO_MAIN=$(filter-out $(CODEDIR)/main.c,$(CFILES))
+HPPFILES=$(wildcard $(INCDIR)/*.hpp)
 OFILES_C=$(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(CFILES)))
 OFILES_CPP=$(patsubst %.cpp, $(BUILD_DIR)/%.o, $(notdir $(CPPFILES)))
-CPPFILES=$(foreach DIR,$(CODEDIR),$(wildcard $(DIR)/*.cpp))
-DEPFILES=$(patsubst %.c, %.d, $(CFILES))
+DEPFILES=$(patsubst %.c, %.d, $(CFILES)) $(patsubst %.cpp, %.d, $(CPPFILES))
 -include $(DEPFILES)
 
 #=================================================================================================================
@@ -63,11 +65,11 @@ CHECK_LIBS= -lcheck -lsubunit -lm
 test: $(TEST_DIR)/bin $(TESTBINS)
 	@for test in $(TESTBINS) ; do ./$$test ; done
 
-$(TEST_DIR)/bin/%: $(TEST_DIR)/%.c $(CFILES)
-	$(CXX) $(CFLAGS) -o $@ $< $(filter-out src/main.c,$(CFILES)) $(CHECK_LIBS) $(TESTFLAGS)
+$(TEST_DIR)/bin/%: $(TEST_DIR)/%.c $(CFILES) 
+	$(CXX) $(CFLAGS) -o $@ $< $(CFILES_NO_MAIN) $(CHECK_LIBS) $(TESTFLAGS)
 
-$(TEST_DIR)/bin/%: $(TEST_DIR)/%.cpp $(CPPFILES)
-	$(CXX) $(CPP_VER) $(CFLAGS) -o $@ $< $(filter-out src/main.cpp,$(CPPFILES)) $(CFILES) $(GTEST_LIBS) $(TESTFLAGS)
+$(TEST_DIR)/bin/%: $(TEST_DIR)/%.cpp $(CPPFILES) $(HPPFILES)
+	$(CXX) $(CPP_VER) $(CFLAGS) -o $@ $< $(CPPFILES_NO_MAIN) $(CFILES) $(GTEST_LIBS) $(TESTFLAGS)
 
 $(TEST_DIR)/bin:
 	mkdir -p $@
