@@ -50,8 +50,6 @@ struct BTree {
 
     //--------------------------------------------------------------------------------------------------------------------------------
   private:
-    void initializeTree();
-
     BTreePage *findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs, page_id_t *found_pid);
 
     // Splits provided root node and creates a new tree root
@@ -61,21 +59,32 @@ struct BTree {
     TREE_NODE_FUNC_TYPE void splitNonRootNode(BTreePage *old_node, const page_id_t old_node_pid,
                                               std::stack<BREADCRUMB_TYPE> &breadcrumbs);
 
-    // Redistributes keys/values between node1 and node2
-    TREE_NODE_FUNC_TYPE inline static void redistribute_kv(BTreePage *node1, BTreePage *node2) {
-        bool is_leaf = node1->is_leaf && node2->is_leaf;
+    // Redistributes keys/values between provided nodes.
+    // Currently made specifically for splitting nodes, will be modified if needed for other operations
+    TREE_NODE_FUNC_TYPE inline static void redistribute_kv(BTreePage *empty_node, BTreePage *full_node) {
+        empty_node->keys = BTreePage::vec_second_half(full_node->keys,empty_node->is_leaf);
+        full_node->keys = BTreePage::vec_first_half(full_node->keys);
 
-        node1->keys = BTreePage::vec_second_half(node2->keys, is_leaf);
-        node2->keys = BTreePage::vec_first_half(node2->keys, is_leaf);
-        std::vector<VAL_T> full;
+        std::vector<VAL_T> full_vals;
+        if constexpr (std::same_as<VAL_T, RID>) {
+            full_vals = LEAF_RECORDS(full_node->values);
+            empty_node->values = BTreePage::vec_second_half<VAL_T>(full_vals);
+            full_node->values = BTreePage::vec_first_half<VAL_T>(full_vals);
+        } else {
+            full_vals = INTERNAL_CHILDREN(full_node->values);
+            empty_node->values = BTreePage::vec_second_half<VAL_T>(full_vals, false);
+            full_node->values = BTreePage::vec_first_half<VAL_T>(full_vals, true);
 
-        if constexpr (std::same_as<VAL_T, RID>)
-            full = LEAF_RECORDS(node2->values);
-        else
-            full = INTERNAL_CHILDREN(node2->values);
+            // full_node is basically the root node before splitting which goes to the left of the root after splitting,
+            // which means we need to move its rightmost pointer to the new node which goes to the right of the root
+            // after splitting, and since we now have same number of keys as values in the full_node, make its last
+            // value the rightmost pointer instead
+            empty_node->rightmost_ptr = full_node->rightmost_ptr;
 
-        node1->values = BTreePage::vec_second_half<VAL_T>(full);
-        node2->values = BTreePage::vec_first_half<VAL_T>(full);
+            full_vals = INTERNAL_CHILDREN(full_node->values);
+            full_node->rightmost_ptr = full_vals.at(full_vals.size() - 1);
+            full_vals.pop_back();
+        }
     }
 
     // Updates provided node's contents(data) in the buffer pool and flushes it to disk

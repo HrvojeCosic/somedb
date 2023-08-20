@@ -188,10 +188,43 @@ TEST_F(IndexTestFixture, InsertTest_Splits) {
     EXPECT_EQ(right_node->keys == right_node_keys, true);
 
     // Test internal node split
-    for (int i = 7; i < 13;
-         i++) { // (OBRISI OVO) i=12 neide, tj kad dode do M odnosno kad treba splitat leaf i onda root cvor
+    for (int i = 7; i < 13; i++) // until "M", which triggers leaf + root split
         tree->insert(keys[i], vals[i]);
-    }
+
+    // ROOT and FIRST LEVEL
+    curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
+    left_node = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(0), tree->bpm)->data);
+    right_node = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
+    EXPECT_EQ(curr_root->keys.size(), 1);
+    left_node_keys = {keys[4], keys[3]};   // C E
+    right_node_keys = {keys[8], keys[10]}; // I K
+    EXPECT_EQ(left_node->keys == left_node_keys, true);
+    EXPECT_EQ(right_node->keys == right_node_keys, true);
+
+    // SECOND LEVEL (LEAF NODES)
+    auto left_left_2 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(left_node->values).at(0), tree->bpm)->data);
+    std::vector<BTreeKey> left_left_2_keys = {keys[0], keys[1]}; // A B
+    EXPECT_EQ(left_left_2->keys == left_left_2_keys, true);
+    //-------------
+    auto left_mid_2 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(left_node->values).at(1), tree->bpm)->data);
+    std::vector<BTreeKey> left_mid_2_keys = {keys[4], keys[2]}; // C D
+    EXPECT_EQ(left_mid_2->keys == left_mid_2_keys, true);
+    //-------------
+    auto left_right_2_node = new BTreePage(fetch_bpm_page(left_node->rightmost_ptr, tree->bpm)->data);
+    std::vector<BTreeKey> left_right_2_node_keys = {keys[3], keys[5]}; // E F
+    EXPECT_EQ(left_right_2_node->keys == left_right_2_node_keys, true);
+    //-------------
+    auto right_left_2 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(right_node->values).at(0), tree->bpm)->data);
+    std::vector<BTreeKey> right_left_2_node_keys = {keys[6], keys[7]}; // G H
+    EXPECT_EQ(right_left_2->keys == right_left_2_node_keys, true);
+    //-------------
+    auto right_mid_2 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(right_node->values).at(1), tree->bpm)->data);
+    std::vector<BTreeKey> right_mid_2_node_keys = {keys[8], keys[9]}; // I J
+    EXPECT_EQ(right_mid_2->keys == right_mid_2_node_keys, true);
+    //-------------
+    auto right_right_2 = new BTreePage(fetch_bpm_page(right_node->rightmost_ptr, tree->bpm)->data);
+    std::vector<BTreeKey> right_right_2_node_keys = {keys[10], keys[11], keys[12]}; // K L M
+    EXPECT_EQ(right_right_2->keys == right_right_2_node_keys, true);
 }
 
 int main(int argc, char **argv) {

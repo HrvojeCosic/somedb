@@ -47,11 +47,13 @@ struct BTreePage {
     std::vector<BTreeKey> keys;
     u8 flags;
 
-    // only storing file offsets of connected nodes so it's not necessary to load them from disk before referencing them
+    // only storing file offsets of connected nodes so it's not necessary to load
+    // them from disk before referencing them
     page_id_t rightmost_ptr;
     page_id_t next;
 
-    /* Depending on node type, store record ids of tuples (leaf) or pointers to descendants (internal). */
+    /* Depending on node type, store record ids of tuples (leaf) or pointers to
+     * descendants (internal). */
     std::variant<std::vector<RID>, std::vector<u32>> values;
     //--------------------------------------------------------------------------------------------------------------------------------
     /* Deserialize given page data into a BTreePage instance */
@@ -66,24 +68,28 @@ struct BTreePage {
     /* From page bytes, determine if the page is of leaf type*/
     inline bool get_is_leaf(u8 data[PAGE_SIZE]) { return *(data + IS_LEAF_OFFSET) == true; }
 
-    /* If first key is bigger return >0, if second is bigger return <0, if equal return 0 */
+    /* If first key is bigger return >0, if second is bigger return <0, if equal
+     * return 0 */
     inline static int cmpKeys(const u8 *key1, const u8 *key2, u16 len1, u16 len2) {
         u16 len = std::min(len1, len2);
         return memcmp(key1, key2, len);
     }
 
-    /* Get the second half of the vector (useful for things like node splits) */
+    /* Get the second half of the vector.
+     * Include middle vector element at the beginning if INCLUDE_MID is true, leave out otherwise
+     */
     template <typename T>
     inline static std::vector<T> vec_second_half(std::vector<T> full_vec, bool include_mid = true) {
-        const int subtractor = include_mid ? 0 : 1;
-        return {full_vec.begin() + (full_vec.size() / 2) - subtractor, full_vec.end()};
+        const u8 includer = include_mid ? 0 : 1;
+        return {full_vec.begin() + (full_vec.size() / 2) + includer, full_vec.end()};
     }
 
-    /* Get the first half of the vector */
-    template <typename T>
-    inline static std::vector<T> vec_first_half(std::vector<T> full_vec, bool include_mid = true) {
-        const int subtractor = include_mid ? 0 : 1;
-        return {full_vec.begin(), full_vec.begin() + (full_vec.size() / 2) - subtractor};
+    /* Get the first half of the vector 
+     * Include middle vector element at the end if INCLUDE_MID is true, leave out otherwise
+     */
+    template <typename T> inline static std::vector<T> vec_first_half(std::vector<T> full_vec, bool include_mid = false) {
+        const u8 includer = include_mid ? 1 : 0;
+        return {full_vec.begin(), full_vec.begin() + (full_vec.size() / 2) + includer};
     }
 
     /*
