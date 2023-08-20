@@ -60,8 +60,6 @@ struct BTreePage {
     BTreePage(u8 data[PAGE_SIZE]);
 
     BTreePage(bool is_leaf);
-
-    ~BTreePage();
     //--------------------------------------------------------------------------------------------------------------------------------
     u8 *serialize() const;
 
@@ -84,10 +82,11 @@ struct BTreePage {
         return {full_vec.begin() + (full_vec.size() / 2) + includer, full_vec.end()};
     }
 
-    /* Get the first half of the vector 
+    /* Get the first half of the vector
      * Include middle vector element at the end if INCLUDE_MID is true, leave out otherwise
      */
-    template <typename T> inline static std::vector<T> vec_first_half(std::vector<T> full_vec, bool include_mid = false) {
+    template <typename T>
+    inline static std::vector<T> vec_first_half(std::vector<T> full_vec, bool include_mid = false) {
         const u8 includer = include_mid ? 1 : 0;
         return {full_vec.begin(), full_vec.begin() + (full_vec.size() / 2) + includer};
     }

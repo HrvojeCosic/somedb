@@ -58,7 +58,7 @@ page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
     if (max_size < leaf->keys.size()) {
         assert(root_pid != BTREE_METADATA_PAGE_ID);
         if (breadcrumbs.size() == 0)
-            splitRootNode<RID>(*leaf);
+            splitRootNode<RID>(leaf);
         else
             splitNonRootNode<RID>(leaf, leaf_pid, breadcrumbs);
     }
@@ -67,12 +67,12 @@ page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
     return leaf_pid;
 }
 
-TREE_NODE_FUNC_TYPE void BTree::splitNonRootNode(BTreePage *old_node, const page_id_t old_node_pid,
+TREE_NODE_FUNC_TYPE void BTree::splitNonRootNode(std::unique_ptr<BTreePage> &old_node, const page_id_t old_node_pid,
                                                  std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
     auto mid_key = old_node->keys.at(old_node->keys.size() / 2);
     constexpr bool is_node_leaf = std::same_as<VAL_T, RID>;
 
-    auto new_node = new BTreePage(is_node_leaf);
+    auto new_node = std::make_unique<BTreePage>(is_node_leaf);
     const page_id_t new_node_id = new_btree_index_page(bpm->disk_manager, is_node_leaf);
     node_count++;
 
@@ -86,7 +86,7 @@ TREE_NODE_FUNC_TYPE void BTree::splitNonRootNode(BTreePage *old_node, const page
     BREADCRUMB_TYPE prev_crumb = breadcrumbs.top();
     breadcrumbs.pop();
     auto parent_bpm_page = fetch_bpm_page(prev_crumb.first, bpm);
-    auto parent = new BTreePage(parent_bpm_page->data);
+    auto parent = std::make_unique<BTreePage>(parent_bpm_page->data);
     parent->insertIntoNode(mid_key, old_node_pid);
     if (parent->keys.at(parent->keys.size() - 1) == mid_key)
         parent->rightmost_ptr = new_node_id;
@@ -100,30 +100,31 @@ TREE_NODE_FUNC_TYPE void BTree::splitNonRootNode(BTreePage *old_node, const page
     // call for other ascendants if necessary
     if (parent->keys.size() > max_size) {
         if (breadcrumbs.empty()) {
-            splitRootNode<u32>(*new BTreePage(fetch_bpm_page(root_pid, bpm)->data));
+            std::unique_ptr<BTreePage> root_page = std::make_unique<BTreePage>(fetch_bpm_page(root_pid, bpm)->data);
+            splitRootNode<u32>(root_page);
         } else {
             page_id_t old_pid = breadcrumbs.top().first;
-            auto top = getPrevBreadcrumbPage(*parent, breadcrumbs);
+            auto top = getPrevBreadcrumbPage(std::move(parent), breadcrumbs);
             assert(top != nullptr);
             splitNonRootNode<u32>(top, old_pid, breadcrumbs);
         }
     }
 }
 
-TREE_NODE_FUNC_TYPE void BTree::splitRootNode(BTreePage &old_root_node) {
+TREE_NODE_FUNC_TYPE void BTree::splitRootNode(std::unique_ptr<BTreePage> &old_root_node) {
     auto old_root_pid = root_pid;
-    auto mid_key = old_root_node.keys.at(old_root_node.keys.size() / 2);
+    auto mid_key = old_root_node->keys.at(old_root_node->keys.size() / 2);
     constexpr bool is_old_root_leaf = std::same_as<VAL_T, RID>;
 
     auto new_node_id = new_btree_index_page(bpm->disk_manager, is_old_root_leaf);
     auto new_root_id = new_btree_index_page(bpm->disk_manager, false);
-    auto new_node = new BTreePage(is_old_root_leaf);
-    auto new_root = new BTreePage(false);
+    auto new_node = std::make_unique<BTreePage>(is_old_root_leaf);
+    auto new_root = std::make_unique<BTreePage>(false);
     node_count += 2;
 
-    redistribute_kv<VAL_T>(new_node, &old_root_node);
+    redistribute_kv<VAL_T>(new_node, old_root_node);
 
-    old_root_node.next = new_node_id;
+    old_root_node->next = new_node_id;
 
     // create new root and connect nodes to it
     new_root->keys.insert(new_root->keys.begin(), mid_key);
@@ -137,13 +138,13 @@ TREE_NODE_FUNC_TYPE void BTree::splitRootNode(BTreePage &old_root_node) {
     flush_node(BTREE_METADATA_PAGE_ID, serialize(), bpm);
     flush_node(new_node_id, new_node->serialize(), bpm);
     flush_node(root_pid, new_root->serialize(), bpm);
-    flush_node(old_root_pid, old_root_node.serialize(), bpm);
+    flush_node(old_root_pid, old_root_node->serialize(), bpm);
 }
 
-BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs, page_id_t *found_pid) {
+std::unique_ptr<BTreePage> BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs,
+                                           page_id_t *found_pid) {
     auto *curr_bpm_page = fetch_bpm_page(root_pid, bpm);
-    auto root = new BTreePage(curr_bpm_page->data);
-    auto temp = root;
+    auto temp = std::make_unique<BTreePage>(curr_bpm_page->data);
 
     while (!temp->is_leaf) {
         auto first_key = temp->keys.at(0);
@@ -152,7 +153,7 @@ BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &bre
             breadcrumbs.push(BREADCRUMB_TYPE(curr_bpm_page->id, 0));
             auto next_ptr = std::get<internal_pointers>(temp->values).at(0);
             curr_bpm_page = fetch_bpm_page(next_ptr, bpm);
-            temp = new BTreePage(curr_bpm_page->data);
+            temp = std::make_unique<BTreePage>(curr_bpm_page->data);
             continue;
         }
         for (u16 i = 1; i < temp->keys.size(); i++) {
@@ -163,7 +164,7 @@ BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &bre
                 breadcrumbs.push(BREADCRUMB_TYPE(curr_bpm_page->id, i));
                 auto next_ptr = std::get<internal_pointers>(temp->values).at(i);
                 curr_bpm_page = fetch_bpm_page(next_ptr, bpm);
-                temp = new BTreePage(curr_bpm_page->data);
+                temp = std::make_unique<BTreePage>(curr_bpm_page->data);
                 continue;
             }
         }
@@ -171,7 +172,7 @@ BTreePage *BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &bre
         // provided key is bigger than rightmost pointer
         breadcrumbs.push(BREADCRUMB_TYPE(curr_bpm_page->id, -1));
         curr_bpm_page = fetch_bpm_page(temp->rightmost_ptr, bpm);
-        temp = new BTreePage(curr_bpm_page->data);
+        temp = std::make_unique<BTreePage>(curr_bpm_page->data);
     }
 
     *found_pid = curr_bpm_page->id;

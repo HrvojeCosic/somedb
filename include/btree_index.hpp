@@ -50,19 +50,21 @@ struct BTree {
 
     //--------------------------------------------------------------------------------------------------------------------------------
   private:
-    BTreePage *findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs, page_id_t *found_pid);
+    std::unique_ptr<BTreePage> findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs,
+                                        page_id_t *found_pid);
 
     // Splits provided root node and creates a new tree root
-    TREE_NODE_FUNC_TYPE void splitRootNode(BTreePage &curr_root);
+    TREE_NODE_FUNC_TYPE void splitRootNode(std::unique_ptr<BTreePage> &curr_root_node);
 
     // Splits provided leaf node and propagates the split up the tree if necessary
-    TREE_NODE_FUNC_TYPE void splitNonRootNode(BTreePage *old_node, const page_id_t old_node_pid,
+    TREE_NODE_FUNC_TYPE void splitNonRootNode(std::unique_ptr<BTreePage> &old_node, const page_id_t old_node_pid,
                                               std::stack<BREADCRUMB_TYPE> &breadcrumbs);
 
     // Redistributes keys/values between provided nodes.
     // Currently made specifically for splitting nodes, will be modified if needed for other operations
-    TREE_NODE_FUNC_TYPE inline static void redistribute_kv(BTreePage *empty_node, BTreePage *full_node) {
-        empty_node->keys = BTreePage::vec_second_half(full_node->keys,empty_node->is_leaf);
+    TREE_NODE_FUNC_TYPE inline static void redistribute_kv(std::unique_ptr<BTreePage> &empty_node,
+                                                           std::unique_ptr<BTreePage> &full_node) {
+        empty_node->keys = BTreePage::vec_second_half(full_node->keys, empty_node->is_leaf);
         full_node->keys = BTreePage::vec_first_half(full_node->keys);
 
         std::vector<VAL_T> full_vals;
@@ -98,14 +100,15 @@ struct BTree {
 
     // Creates a BTreePage object from the breadcrumb at the top of the provided breadcrumbs stack and returns a pointer
     // to it, or null if stack is empty
-    inline BTreePage *getPrevBreadcrumbPage(BTreePage &parent, std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
+    inline std::unique_ptr<BTreePage> getPrevBreadcrumbPage(std::unique_ptr<BTreePage> parent,
+                                                            std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
         if (breadcrumbs.empty())
             return nullptr;
 
         auto top_key = breadcrumbs.top().second;
         breadcrumbs.pop();
-        page_id_t pid = top_key == -1 ? parent.rightmost_ptr : top_key;
-        return new BTreePage(fetch_bpm_page(pid, bpm)->data);
+        page_id_t pid = top_key == -1 ? parent->rightmost_ptr : top_key;
+        return std::make_unique<BTreePage>(fetch_bpm_page(pid, bpm)->data);
     }
 
     //--------------------------------------------------------------------------------------------------------------------------------

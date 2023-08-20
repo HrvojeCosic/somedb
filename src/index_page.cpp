@@ -14,12 +14,6 @@
 
 namespace somedb {
 
-BTreePage::~BTreePage() {
-    for (auto &key : keys) {
-        delete[] key.data;
-    }
-}
-
 BTreePage::BTreePage(bool is_leaf) : is_leaf(is_leaf) {
     if (is_leaf)
         values = std::vector<RID>();
