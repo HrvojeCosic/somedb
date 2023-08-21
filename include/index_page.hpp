@@ -42,6 +42,15 @@ namespace somedb {
 using leaf_records = std::vector<RID>;
 using internal_pointers = std::vector<u32>;
 
+struct BTreeKey {
+    u8 *data;
+    u8 length;
+
+    bool operator==(const BTreeKey &other) const {
+        return (length == other.length) && (std::memcmp(data, other.data, length) == 0);
+    }
+};
+
 struct BTreePage {
     bool is_leaf;
     std::vector<BTreeKey> keys;

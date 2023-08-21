@@ -18,16 +18,35 @@ class IndexTestFixture : public testing::Test {
 
     const u16 tree_max_size = 4;
 
+    size_t keys_length;
+    std::vector<BTreeKey> keys;
+    std::vector<RID> vals;
+    std::string keys_data[100] = {"A", "B", "D", "E", "C", "F", "G", "H", "I", "J",
+                                  "K", "L", "M", "N", "O", "P", "Q", "R", "S"};
+
     void SetUp() override {
+        // Table setup
         char cname1[5] = "name";
         char cname2[5] = "age";
         Column cols[2] = {{.name_len = (u8)strlen(cname1), .name = cname1, .type = STRING},
                           {.name_len = (u8)strlen(cname2), .name = cname2, .type = UINT16}};
         create_table(table_name, cols, (sizeof(cols) / sizeof(Column)));
 
+        // Index setup (file, cache etc.)
         disk_mgr = create_btree_index(index_name, tree_max_size);
         disk_mgr->page_type = BTREE_INDEX_PAGE;
         bpm = new_bpm(100, disk_mgr);
+
+        // Data setup
+        keys_length = sizeof(keys_data) / sizeof(keys_data[0]);
+        keys.reserve(keys_length);
+        vals.reserve(keys_length);
+        for (u16 i = 0; i < keys_length; i++) {
+            keys[i] = {reinterpret_cast<u8 *>(keys_data[i].data()), static_cast<u8>(keys_data[i].length())};
+            const page_id_t pid = i + 1;
+            const u32 slot_num = i + 2;
+            vals[i] = {.pid = pid, .slot_num = slot_num};
+        }
     }
 
     void TearDown() override {
@@ -130,18 +149,6 @@ TEST_F(IndexTestFixture, InsertTest_Splits) {
     auto tree = new BTree(bpm);
     tree->deserialize();
 
-    std::string keys_data[100] = {"A", "B", "D", "E", "C", "F", "G", "H", "I", "J",
-                                  "K", "L", "M", "N", "O", "P", "Q", "R", "S"};
-    size_t keys_length = sizeof(keys_data) / sizeof(keys_data[0]);
-    BTreeKey keys[keys_length];
-    RID vals[keys_length];
-    for (u16 i = 0; i < keys_length; i++) {
-        keys[i] = {reinterpret_cast<u8 *>(keys_data[i].data()), static_cast<u8>(keys_data[i].length())};
-        const page_id_t pid = i + 1;
-        const u32 slot_num = i + 2;
-        vals[i] = {.pid = pid, .slot_num = slot_num};
-    }
-
     // Test simple insert
     auto leaf_pid1 = tree->insert(keys[0], vals[0]);
     tree->insert(keys[1], vals[1]);
@@ -225,6 +232,26 @@ TEST_F(IndexTestFixture, InsertTest_Splits) {
     auto right_right_2 = new BTreePage(fetch_bpm_page(right_node->rightmost_ptr, tree->bpm)->data);
     std::vector<BTreeKey> right_right_2_node_keys = {keys[10], keys[11], keys[12]}; // K L M
     EXPECT_EQ(right_right_2->keys == right_right_2_node_keys, true);
+}
+
+TEST_F(IndexTestFixture, RemoveTest_NoMerges) {
+    auto tree = std::make_unique<BTree>(bpm);
+    tree->deserialize();
+
+    // Insert two elements
+    tree->insert(keys[0], vals[0]);
+    tree->insert(keys[1], vals[1]);
+    auto curr_root = std::make_unique<BTreePage>(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
+    EXPECT_EQ(curr_root->keys.size(), 2);
+    EXPECT_EQ(LEAF_RECORDS(curr_root->values).size(), 2);
+
+    // Test removing one and having one left
+    tree->remove(keys[0]);
+    curr_root = std::move(std::make_unique<BTreePage>(fetch_bpm_page(tree->root_pid, tree->bpm)->data));
+    EXPECT_EQ(curr_root->keys.at(0), keys[1]);
+    EXPECT_EQ(curr_root->keys.size(), 1);
+    EXPECT_EQ(LEAF_RECORDS(curr_root->values).at(0), vals[1]);
+    EXPECT_EQ(LEAF_RECORDS(curr_root->values).size(), 1);
 }
 
 int main(int argc, char **argv) {

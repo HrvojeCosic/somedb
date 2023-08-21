@@ -29,16 +29,9 @@ enum PageType { HEAP_PAGE = 1, BTREE_INDEX_PAGE = 2, INVALID = 0 };
  */
 #define RID_SIZE sizeof(u32) * 2
 
-typedef struct {
+typedef struct RID {
     page_id_t pid;
     uint32_t slot_num;
+
+    bool operator==(const RID &other) const { return (pid == other.pid) && (slot_num == other.slot_num); }
 } RID;
-
-struct BTreeKey {
-    u8 *data;
-    u8 length;
-
-    bool operator==(const BTreeKey &other) const {
-        return (length == other.length) && (std::memcmp(data, other.data, length) == 0);
-    }
-};

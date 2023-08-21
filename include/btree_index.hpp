@@ -44,14 +44,17 @@ struct BTree {
 
     bool getValues(const BTreeKey &key, std::vector<RID> &result);
 
+    void remove(const BTreeKey &key);
+
     // Inserts element into the tree and returns page id of leaf the element is inserted in if successful, or 0 if
     // provided key already exists
     page_id_t insert(const BTreeKey &key, const RID &val);
 
     //--------------------------------------------------------------------------------------------------------------------------------
   private:
+    // Finds the leaf appropriate for the provided key and returns a pointer to it.
     std::unique_ptr<BTreePage> findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs,
-                                        page_id_t *found_pid);
+                                        page_id_t &found_pid);
 
     // Splits provided root node and creates a new tree root
     TREE_NODE_FUNC_TYPE void splitRootNode(std::unique_ptr<BTreePage> &curr_root_node);

@@ -45,7 +45,7 @@ page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
 
     auto breadcrumbs = std::stack<BREADCRUMB_TYPE>();
     page_id_t leaf_pid = 0;
-    auto leaf = findLeaf(key, breadcrumbs, &leaf_pid);
+    auto leaf = findLeaf(key, breadcrumbs, leaf_pid);
     assert(leaf_pid != BTREE_METADATA_PAGE_ID);
 
     // return early if duplicate key
@@ -141,8 +141,24 @@ TREE_NODE_FUNC_TYPE void BTree::splitRootNode(std::unique_ptr<BTreePage> &old_ro
     flush_node(old_root_pid, old_root_node->serialize(), bpm);
 }
 
+void BTree::remove(const BTreeKey &key) {
+    auto breadcrumbs = std::stack<BREADCRUMB_TYPE>();
+    page_id_t found_pid = 0;
+    auto leaf = findLeaf(key, breadcrumbs, found_pid);
+    auto &leaf_vals = LEAF_RECORDS(leaf->values);
+
+    int i;
+    for (i = 0; i < leaf->keys.size(); i++)
+        if (leaf->keys.at(i) == key)
+            break;
+
+    leaf->keys.erase(leaf->keys.begin() + i);
+    leaf_vals.erase(leaf_vals.begin() + i);
+    flush_node(found_pid, leaf->serialize(), bpm);
+}
+
 std::unique_ptr<BTreePage> BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs,
-                                           page_id_t *found_pid) {
+                                           page_id_t &found_pid) {
     auto *curr_bpm_page = fetch_bpm_page(root_pid, bpm);
     auto temp = std::make_unique<BTreePage>(curr_bpm_page->data);
 
@@ -175,7 +191,7 @@ std::unique_ptr<BTreePage> BTree::findLeaf(const BTreeKey &key, std::stack<BREAD
         temp = std::make_unique<BTreePage>(curr_bpm_page->data);
     }
 
-    *found_pid = curr_bpm_page->id;
+    found_pid = curr_bpm_page->id;
     return temp;
 }
 
