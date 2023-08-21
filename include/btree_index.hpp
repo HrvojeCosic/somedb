@@ -101,17 +101,15 @@ struct BTree {
         flush_page(node_pid, bpm);
     }
 
-    // Creates a BTreePage object from the breadcrumb at the top of the provided breadcrumbs stack and returns a pointer
-    // to it, or null if stack is empty
-    inline std::unique_ptr<BTreePage> getPrevBreadcrumbPage(std::unique_ptr<BTreePage> parent,
-                                                            std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
+    // Returns a page id of the page at the top of the provided stack, or 0 if stack is empty.
+    // Handles the state of the stack
+    inline page_id_t getPrevBreadcrumbPid(std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
         if (breadcrumbs.empty())
-            return nullptr;
+            return 0;
 
-        auto top_key = breadcrumbs.top().second;
+        auto top = breadcrumbs.top();
         breadcrumbs.pop();
-        page_id_t pid = top_key == -1 ? parent->rightmost_ptr : top_key;
-        return std::make_unique<BTreePage>(fetch_bpm_page(pid, bpm)->data);
+        return fetch_bpm_page(top.first, bpm)->id;
     }
 
     //--------------------------------------------------------------------------------------------------------------------------------
