@@ -155,7 +155,8 @@ void BTree::remove(const BTreeKey &key) {
     flush_node(found_pid, leaf->serialize(), bpm);
 
     // If current node has number of elements under the balance threshold, merge it with its sibling.
-    bool is_left_sib = breadcrumbs.top().second == -1;
+    int parent_link = breadcrumbs.top().second;
+    bool is_left_sib = parent_link == -1;
     auto parent_pid = getPrevBreadcrumbPid(breadcrumbs);
     auto parent = std::make_unique<BTreePage>(fetch_bpm_page(parent_pid, bpm)->data);
     auto parent_vals = INTERNAL_CHILDREN(parent->values);
@@ -177,6 +178,10 @@ void BTree::remove(const BTreeKey &key) {
             leaf->keys.insert(leaf->keys.end(), sibling->keys.begin(), sibling->keys.end());
             leaf_vals.insert(leaf_vals.end(), sibling_vals.begin(), sibling_vals.end());
             flush_node(found_pid, leaf->serialize(), bpm);
+
+            parent_vals.erase(parent_vals.begin() + parent_link);
+            parent->keys.erase(parent->keys.begin() + parent_link);
+            flush_node(parent_pid, parent->serialize(), bpm);
         }
     }
 }
