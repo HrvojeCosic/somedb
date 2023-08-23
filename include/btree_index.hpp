@@ -63,6 +63,10 @@ struct BTree {
     TREE_NODE_FUNC_TYPE void splitNonRootNode(std::unique_ptr<BTreePage> &old_node, const page_id_t old_node_pid,
                                               std::stack<BREADCRUMB_TYPE> &breadcrumbs);
 
+    // Checks if provided node needs to be merged with its sibling and propages changes up the tree.
+    // Merge condition is met if provided node has number of elements under the balance threshold.
+    TREE_NODE_FUNC_TYPE void merge(std::unique_ptr<BTreePage> &node, const page_id_t node_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs);
+
     // Redistributes keys/values between provided nodes.
     // Currently made specifically for splitting nodes, will be modified if needed for other operations
     TREE_NODE_FUNC_TYPE inline static void redistribute_kv(std::unique_ptr<BTreePage> &empty_node,
@@ -112,6 +116,13 @@ struct BTree {
         return fetch_bpm_page(top.first, bpm)->id;
     }
 
+    // Returns a vector of node's values, type of which depends on the node type (leaf/internal)
+    TREE_NODE_FUNC_TYPE inline std::vector<VAL_T> &getValues(std::unique_ptr<BTreePage> &node) {
+        if constexpr(std::same_as<VAL_T, RID>)
+            return LEAF_RECORDS(node->values);
+        else
+            return INTERNAL_CHILDREN(node->values);
+    }
     //--------------------------------------------------------------------------------------------------------------------------------
 };
 

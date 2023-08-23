@@ -5,10 +5,9 @@
  *  (16 bit uint) page offset to the beginning of available space
  *  (16 bit uint) page offset to the end of available space
  *  (32 bit uint) page id of previous (sibling) page
- *  (32 bit uint) page id of next (sibling) page
- *  (32 bit uint) page id of rightmost pointer (0 if none (only if page is leaf or there is one value in internal page))
- *  (8 bit uint) special page header flags
- *  (8 bit uint) is_leaf boolean
+ *  (32 bit uint) page id of next (sibling) pag
+ *  (32 bit uint) page id of rightmost pointer (not guaranteed to be 0 for leaf nodes, but should be ignored then)
+ *  (8 bit uint) special page header flags (8 bit uint) is_leaf boolean
  *
  *  Key-value pair pointers consists of:
  *  -16 bit unsigned integer representing the page offset to the corresponding kv pair

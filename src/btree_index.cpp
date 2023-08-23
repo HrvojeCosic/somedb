@@ -141,8 +141,8 @@ TREE_NODE_FUNC_TYPE void BTree::splitRootNode(std::unique_ptr<BTreePage> &old_ro
 
 void BTree::remove(const BTreeKey &key) {
     auto breadcrumbs = std::stack<BREADCRUMB_TYPE>();
-    page_id_t found_pid = 0;
-    auto leaf = findLeaf(key, breadcrumbs, found_pid);
+    page_id_t leaf_pid = 0;
+    auto leaf = findLeaf(key, breadcrumbs, leaf_pid);
     auto &leaf_vals = LEAF_RECORDS(leaf->values);
 
     uint i;
@@ -152,32 +152,38 @@ void BTree::remove(const BTreeKey &key) {
 
     leaf->keys.erase(leaf->keys.begin() + i);
     leaf_vals.erase(leaf_vals.begin() + i);
-    flush_node(found_pid, leaf->serialize(), bpm);
+    flush_node(leaf_pid, leaf->serialize(), bpm);
 
-    // If current node has number of elements under the balance threshold, merge it with its sibling.
+    merge<RID>(leaf, leaf_pid, breadcrumbs);
+}
+
+TREE_NODE_FUNC_TYPE void BTree::merge(std::unique_ptr<BTreePage> &node, const page_id_t node_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
     int parent_link = breadcrumbs.top().second;
-    bool is_left_sib = parent_link == -1;
     auto parent_pid = getPrevBreadcrumbPid(breadcrumbs);
     auto parent = std::make_unique<BTreePage>(fetch_bpm_page(parent_pid, bpm)->data);
     auto parent_vals = INTERNAL_CHILDREN(parent->values);
+
     // We choose the right sibling by default, unless the current node is a parent's rightmost pointer
-    auto sibling_pid = is_left_sib ? parent_vals.at(parent_vals.size() - 1) : leaf->next;
+    bool is_left_sib = parent_link == -1;
+    auto sibling_pid = is_left_sib ? parent_vals.at(parent_vals.size() - 1) : node->next;
     auto sibling = std::make_unique<BTreePage>(fetch_bpm_page(sibling_pid, bpm)->data);
-    if (sibling->is_leaf && sibling->keys.size() + leaf->keys.size() <= max_size) {
-        auto &sibling_vals = LEAF_RECORDS(sibling->values);
-        leaf_vals = LEAF_RECORDS(leaf->values);
+    auto node_vals = getValues<VAL_T>(node);
+
+    if (sibling_pid && sibling->keys.size() + node->keys.size() <= max_size) {
+        auto &sibling_vals = getValues<VAL_T>(sibling);
         if (is_left_sib) {
-            sibling->keys.insert(sibling->keys.end(), leaf->keys.begin(), leaf->keys.end());
-            sibling_vals.insert(sibling_vals.end(), leaf_vals.begin(), leaf_vals.end());
+            sibling->keys.insert(sibling->keys.end(), node->keys.begin(), node->keys.end());
+            sibling_vals.insert(sibling_vals.end(), node_vals.begin(), node_vals.end());
+            sibling->rightmost_ptr = node->rightmost_ptr;
             flush_node(sibling_pid, sibling->serialize(), bpm);
 
             parent->rightmost_ptr = sibling_pid;
             INTERNAL_CHILDREN(parent->values).pop_back();
             flush_node(parent_pid, parent->serialize(), bpm);
         } else {
-            leaf->keys.insert(leaf->keys.end(), sibling->keys.begin(), sibling->keys.end());
-            leaf_vals.insert(leaf_vals.end(), sibling_vals.begin(), sibling_vals.end());
-            flush_node(found_pid, leaf->serialize(), bpm);
+            node->keys.insert(node->keys.end(), sibling->keys.begin(), sibling->keys.end());
+            node_vals.insert(node_vals.end(), sibling_vals.begin(), sibling_vals.end());
+            flush_node(node_pid, node->serialize(), bpm);
 
             parent_vals.erase(parent_vals.begin() + parent_link);
             parent->keys.erase(parent->keys.begin() + parent_link);
