@@ -77,9 +77,8 @@ struct BTreePage {
 
     /* If first key is bigger return >0, if second is bigger return <0, if equal
      * return 0 */
-    inline static int cmpKeys(const u8 *key1, const u8 *key2, u16 len1, u16 len2) {
-        u16 len = std::min(len1, len2);
-        return memcmp(key1, key2, len);
+    inline static int cmpKeys(const BTreeKey &key1, const BTreeKey &key2) {
+        return memcmp(key1.data, key2.data, std::min(key1.length, key2.length));
     }
 
     /* Get the second half of the vector.

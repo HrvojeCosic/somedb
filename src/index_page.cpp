@@ -27,8 +27,8 @@ u8 *BTreePage::serialize() const {
     u16 available_space_end = PAGE_SIZE;
 
     // populate data with kv pairs and their pointers in slotted page format
-    int i = keys.empty() ? 0 : (keys.size() - 1);
-    while (i >= 0) {
+    int i = keys.empty() ? 0 : (keys.size());
+    while (--i >= 0) {
         auto key = keys.at(i);
         u8 val_size = 0;
         u8 val_buf[RID_SIZE];
@@ -39,6 +39,8 @@ u8 *BTreePage::serialize() const {
             val_size += RID_SIZE;
         } else {
             auto children = INTERNAL_CHILDREN(values);
+            if (children.size() == (uint)i)
+                continue;
             encode_uint32(children.at(i), val_buf);
             val_size += sizeof(u32);
         }
@@ -54,7 +56,6 @@ u8 *BTreePage::serialize() const {
 
         available_space_end -= kv_size;
         available_space_start += TREE_KV_PTR_SIZE;
-        i--;
     }
 
     encode_uint16(available_space_start, data + AVAILABLE_SPACE_START_OFFSET);
@@ -123,12 +124,12 @@ TREE_NODE_FUNC_TYPE void BTreePage::insertIntoNode(const BTreeKey &key, VAL_T va
     auto last_key = keys.at(size == 0 ? size : size - 1);
 
     // New key is larger (or equal) than all current ones
-    if (cmpKeys(key.data, last_key.data, key.length, last_key.length) >= 0) {
+    if (cmpKeys(key, last_key) >= 0) {
         keys.at(keys.size() - 1) = key;
         node_values.at(node_values.size() - 1) = val;
     }
     // New key is smaller (or equal) than all current ones
-    else if (cmpKeys(key.data, first_key.data, key.length, first_key.length) <= 0) {
+    else if (cmpKeys(key, first_key) <= 0) {
         std::vector<BTreeKey> new_keys;
         new_keys.reserve(size + 1);
         new_keys.push_back(key);
@@ -147,8 +148,7 @@ TREE_NODE_FUNC_TYPE void BTreePage::insertIntoNode(const BTreeKey &key, VAL_T va
         for (uint16_t i = 0; i < size; i++) {
             auto curr_key = keys.at(i);
             auto next_key = keys.at(i + 1);
-            if (cmpKeys(key.data, curr_key.data, key.length, curr_key.length) > 0 &&
-                cmpKeys(key.data, next_key.data, key.length, next_key.length) <= 0) {
+            if (cmpKeys(key, curr_key) > 0 && cmpKeys(key, next_key) <= 0) {
                 // shift all elements to right (for both keys and values)
                 BTreeKey prev_key = keys.at(i + 1);
                 VAL_T prev_value = node_values.at(i + 1);

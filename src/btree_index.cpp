@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <stack>
 #include <stdexcept>
@@ -50,7 +51,7 @@ page_id_t BTree::insert(const BTreeKey &key, const RID &val) {
 
     // return early if duplicate key
     for (BTreeKey leaf_key : leaf->keys)
-        if (BTreePage::cmpKeys(leaf_key.data, key.data, leaf_key.length, key.length) == 0)
+        if (BTreePage::cmpKeys(leaf_key, key) == 0)
             return 0;
 
     leaf->insertIntoNode<RID>(key, val);
@@ -144,7 +145,7 @@ void BTree::remove(const BTreeKey &key) {
     auto leaf = findLeaf(key, breadcrumbs, found_pid);
     auto &leaf_vals = LEAF_RECORDS(leaf->values);
 
-    int i;
+    uint i;
     for (i = 0; i < leaf->keys.size(); i++)
         if (leaf->keys.at(i) == key)
             break;
@@ -152,6 +153,32 @@ void BTree::remove(const BTreeKey &key) {
     leaf->keys.erase(leaf->keys.begin() + i);
     leaf_vals.erase(leaf_vals.begin() + i);
     flush_node(found_pid, leaf->serialize(), bpm);
+
+    // If current node has number of elements under the balance threshold, merge it with its sibling.
+    bool is_left_sib = breadcrumbs.top().second == -1;
+    auto parent_pid = getPrevBreadcrumbPid(breadcrumbs);
+    auto parent = std::make_unique<BTreePage>(fetch_bpm_page(parent_pid, bpm)->data);
+    auto parent_vals = INTERNAL_CHILDREN(parent->values);
+    // We choose the right sibling by default, unless the current node is a parent's rightmost pointer
+    auto sibling_pid = is_left_sib ? parent_vals.at(parent_vals.size() - 1) : leaf->next;
+    auto sibling = std::make_unique<BTreePage>(fetch_bpm_page(sibling_pid, bpm)->data);
+    if (sibling->is_leaf && sibling->keys.size() + leaf->keys.size() <= max_size) {
+        auto &sibling_vals = LEAF_RECORDS(sibling->values);
+        leaf_vals = LEAF_RECORDS(leaf->values);
+        if (is_left_sib) {
+            sibling->keys.insert(sibling->keys.end(), leaf->keys.begin(), leaf->keys.end());
+            sibling_vals.insert(sibling_vals.end(), leaf_vals.begin(), leaf_vals.end());
+            flush_node(sibling_pid, sibling->serialize(), bpm);
+
+            parent->rightmost_ptr = sibling_pid;
+            INTERNAL_CHILDREN(parent->values).pop_back();
+            flush_node(parent_pid, parent->serialize(), bpm);
+        } else {
+            leaf->keys.insert(leaf->keys.end(), sibling->keys.begin(), sibling->keys.end());
+            leaf_vals.insert(leaf_vals.end(), sibling_vals.begin(), sibling_vals.end());
+            flush_node(found_pid, leaf->serialize(), bpm);
+        }
+    }
 }
 
 std::unique_ptr<BTreePage> BTree::findLeaf(const BTreeKey &key, std::stack<BREADCRUMB_TYPE> &breadcrumbs,
@@ -162,7 +189,7 @@ std::unique_ptr<BTreePage> BTree::findLeaf(const BTreeKey &key, std::stack<BREAD
     while (!temp->is_leaf) {
         auto first_key = temp->keys.at(0);
         // provided key is smaller than first existing key
-        if (BTreePage::cmpKeys(first_key.data, key.data, first_key.length, key.length) > 0) {
+        if (BTreePage::cmpKeys(first_key, key) > 0) {
             breadcrumbs.push(BREADCRUMB_TYPE(curr_bpm_page->id, 0));
             auto next_ptr = std::get<internal_pointers>(temp->values).at(0);
             curr_bpm_page = fetch_bpm_page(next_ptr, bpm);
@@ -172,8 +199,7 @@ std::unique_ptr<BTreePage> BTree::findLeaf(const BTreeKey &key, std::stack<BREAD
         for (u16 i = 1; i < temp->keys.size(); i++) {
             auto prev_key = temp->keys.at(i - 1);
             auto curr_key = temp->keys.at(i);
-            if (BTreePage::cmpKeys(prev_key.data, key.data, prev_key.length, key.length) > 0 &&
-                BTreePage::cmpKeys(curr_key.data, key.data, curr_key.length, key.length) <= 0) {
+            if (BTreePage::cmpKeys(prev_key, key) > 0 && BTreePage::cmpKeys(curr_key, key) <= 0) {
                 breadcrumbs.push(BREADCRUMB_TYPE(curr_bpm_page->id, i));
                 auto next_ptr = std::get<internal_pointers>(temp->values).at(i);
                 curr_bpm_page = fetch_bpm_page(next_ptr, bpm);
