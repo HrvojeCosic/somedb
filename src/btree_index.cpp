@@ -154,41 +154,131 @@ void BTree::remove(const BTreeKey &key) {
     leaf_vals.erase(leaf_vals.begin() + i);
     flush_node(leaf_pid, leaf->serialize(), bpm);
 
-    merge<RID>(leaf, leaf_pid, breadcrumbs);
+    if (!breadcrumbs.empty())
+        mergeLeafNode(leaf_pid, breadcrumbs);
 }
 
-TREE_NODE_FUNC_TYPE void BTree::merge(std::unique_ptr<BTreePage> &node, const page_id_t node_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
-    int parent_link = breadcrumbs.top().second;
-    auto parent_pid = getPrevBreadcrumbPid(breadcrumbs);
-    auto parent = std::make_unique<BTreePage>(fetch_bpm_page(parent_pid, bpm)->data);
-    auto parent_vals = INTERNAL_CHILDREN(parent->values);
+void BTree::mergeLeafNode(const page_id_t leaf_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
+    auto parent_crumb = breadcrumbs.top();
+    breadcrumbs.pop();
+    auto parent = getBtreePage(parent_crumb.first);
+    auto &parent_vals = INTERNAL_CHILDREN(parent->values);
+    auto leaf = getBtreePage(leaf_pid);
 
     // We choose the right sibling by default, unless the current node is a parent's rightmost pointer
-    bool is_left_sib = parent_link == -1;
-    auto sibling_pid = is_left_sib ? parent_vals.at(parent_vals.size() - 1) : node->next;
-    auto sibling = std::make_unique<BTreePage>(fetch_bpm_page(sibling_pid, bpm)->data);
-    auto node_vals = getValues<VAL_T>(node);
+    bool is_left_sib = parent_crumb.second == -1;
+    auto sibling_pid = is_left_sib ? parent_vals.at(parent_vals.size() - 1) : leaf->next;
+    auto sibling_leaf = getBtreePage(sibling_pid);
 
-    if (sibling_pid && sibling->keys.size() + node->keys.size() <= max_size) {
-        auto &sibling_vals = getValues<VAL_T>(sibling);
-        if (is_left_sib) {
-            sibling->keys.insert(sibling->keys.end(), node->keys.begin(), node->keys.end());
-            sibling_vals.insert(sibling_vals.end(), node_vals.begin(), node_vals.end());
-            sibling->rightmost_ptr = node->rightmost_ptr;
-            flush_node(sibling_pid, sibling->serialize(), bpm);
+    // Return if merge condition isn't met
+    if (!sibling_leaf->keys.size() || leaf->keys.size() + sibling_leaf->keys.size() > max_size)
+        return;
 
-            parent->rightmost_ptr = sibling_pid;
-            INTERNAL_CHILDREN(parent->values).pop_back();
-            flush_node(parent_pid, parent->serialize(), bpm);
+    auto &sibling_vals = LEAF_RECORDS(sibling_leaf->values);
+    auto &node_vals = LEAF_RECORDS(leaf->values);
+
+    // Move all elements to node that is more left of the two,
+    // and remove the child pointer of the leaf node that lost its elements from the parent node.
+    // This is done differently depending on if the sibling is left or right
+    if (is_left_sib) {
+        sibling_leaf->keys.insert(sibling_leaf->keys.end(), leaf->keys.begin(), leaf->keys.end());
+        sibling_vals.insert(sibling_vals.end(), node_vals.begin(), node_vals.end());
+        flush_node(sibling_pid, sibling_leaf->serialize(), bpm);
+
+        if (parent->keys.size() == 1) {
+            INTERNAL_CHILDREN(parent->values).at(0) = sibling_pid;
         } else {
-            node->keys.insert(node->keys.end(), sibling->keys.begin(), sibling->keys.end());
-            node_vals.insert(node_vals.end(), sibling_vals.begin(), sibling_vals.end());
-            flush_node(node_pid, node->serialize(), bpm);
-
-            parent_vals.erase(parent_vals.begin() + parent_link);
-            parent->keys.erase(parent->keys.begin() + parent_link);
-            flush_node(parent_pid, parent->serialize(), bpm);
+            parent->rightmost_ptr = sibling_pid;
         }
+        INTERNAL_CHILDREN(parent->values).pop_back();
+        parent->keys.pop_back();
+    } else {
+        leaf->keys.insert(leaf->keys.end(), sibling_leaf->keys.begin(), sibling_leaf->keys.end());
+        node_vals.insert(node_vals.end(), sibling_vals.begin(), sibling_vals.end());
+
+        if (sibling_pid == parent->rightmost_ptr) {
+            parent->rightmost_ptr = 0;
+        } else {
+            leaf->next = sibling_leaf->next;
+            parent_vals.erase(parent_vals.begin() + parent_crumb.second);
+            parent_vals.at(parent_crumb.second) = leaf_pid;
+            parent->keys.erase(parent->keys.begin() + parent_crumb.second);
+        }
+        flush_node(leaf_pid, leaf->serialize(), bpm);
+    }
+
+    flush_node(parent_crumb.first, parent->serialize(), bpm);
+    // If next parent is root, check if its empty due to element demotion and make the current merged node the root
+    // Otherwise, call this function for the parent
+    if (breadcrumbs.empty()) {
+        if (parent->keys.size() == 0) {
+            root_pid = is_left_sib ? sibling_pid : leaf_pid;
+            flush_node(BTREE_METADATA_PAGE_ID, serialize(), bpm);
+        }
+    } else {
+        mergeNonLeafNode(parent_crumb.first, breadcrumbs);
+    }
+}
+
+void BTree::mergeNonLeafNode(const page_id_t node_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs) {
+    // Root is already handled in the function call before we get to the root, so we dont need to do anything more
+    if (breadcrumbs.empty())
+        return;
+
+    auto parent_crumb = breadcrumbs.top();
+    breadcrumbs.pop();
+    auto parent = getBtreePage(parent_crumb.first);
+    auto &parent_vals = INTERNAL_CHILDREN(parent->values);
+    auto node = getBtreePage(node_pid);
+
+    // We choose the right sibling by default, unless we got to the current node with parent's rightmost pointer
+    bool is_left_sib = parent_crumb.second == -1;
+    auto sibling_pid = is_left_sib ? parent_vals.at(parent_vals.size() - 1) : node->next;
+    auto sibling = getBtreePage(sibling_pid);
+
+    // Return if merge condition isn't met
+    u16 total_ptr_num = node->keys.size() + 1 + sibling->keys.size() + 1; // +1 counts the rightmost pointer
+    if (total_ptr_num > max_size + 1)
+        return;
+
+    auto &sibling_vals = INTERNAL_CHILDREN(sibling->values);
+    auto &node_vals = INTERNAL_CHILDREN(node->values);
+
+    if (is_left_sib) {
+        // The separator key is the last key because we came to this level from the rightmsot pointer
+        auto demoted_key = parent->keys.at(parent->keys.size() - 1);
+        parent->keys.erase(parent->keys.begin() + parent->keys.size() - 1);
+        parent->rightmost_ptr = 0;
+
+        sibling->keys.insert(sibling->keys.end(), demoted_key);
+        sibling->keys.insert(sibling->keys.end(), node->keys.begin(), node->keys.end());
+
+        sibling_vals.emplace_back(sibling->rightmost_ptr);
+        sibling_vals.insert(sibling_vals.end(), node_vals.begin(), node_vals.end());
+        sibling->rightmost_ptr = node->rightmost_ptr;
+        flush_node(sibling_pid, sibling->serialize(), bpm);
+    } else {
+        auto demoted_key = parent->keys.at(parent_crumb.second);
+        parent->keys.erase(parent->keys.begin() + parent_crumb.second);
+
+        node->keys.insert(node->keys.end(), demoted_key);
+        node->keys.insert(node->keys.end(), sibling->keys.begin(), sibling->keys.end());
+
+        node_vals.insert(node_vals.end(), sibling_vals.begin(), sibling_vals.end());
+        node->rightmost_ptr = sibling->rightmost_ptr;
+        flush_node(node_pid, node->serialize(), bpm);
+    }
+    flush_node(parent_crumb.first, parent->serialize(), bpm);
+
+    // If next parent is root, check if its empty due to element demotion and make the current merged node the root
+    // Otherwise, call this function for the parent
+    if (breadcrumbs.empty()) {
+        if (parent->keys.size() == 0) {
+            root_pid = is_left_sib ? sibling_pid : node_pid;
+            flush_node(BTREE_METADATA_PAGE_ID, serialize(), bpm);
+        }
+    } else {
+        mergeNonLeafNode(parent_crumb.first, breadcrumbs);
     }
 }
 

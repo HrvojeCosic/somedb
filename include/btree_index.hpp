@@ -63,9 +63,13 @@ struct BTree {
     TREE_NODE_FUNC_TYPE void splitNonRootNode(std::unique_ptr<BTreePage> &old_node, const page_id_t old_node_pid,
                                               std::stack<BREADCRUMB_TYPE> &breadcrumbs);
 
-    // Checks if provided node needs to be merged with its sibling and propages changes up the tree.
-    // Merge condition is met if provided node has number of elements under the balance threshold.
-    TREE_NODE_FUNC_TYPE void merge(std::unique_ptr<BTreePage> &node, const page_id_t node_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs);
+    // Merge leaf node with either sibling if a node can hold up to N key-value pairs, and a combined number of
+    // key-value pairs in two neighboring nodes is less than or equal to N."
+    void mergeLeafNode(const page_id_t leaf_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs);
+
+    // Merge non-leaf node with either sibling if a node can hold up to N + 1 pointers, and a combined number of
+    // pointers in two neighboring nodes is less than or equal to N + 1.
+    void mergeNonLeafNode(const page_id_t node_pid, std::stack<BREADCRUMB_TYPE> &breadcrumbs);
 
     // Redistributes keys/values between provided nodes.
     // Currently made specifically for splitting nodes, will be modified if needed for other operations
@@ -96,6 +100,11 @@ struct BTree {
         }
     }
 
+    // Given its page id, creates and returns a smart pointer of a btree page (the in memory representation)
+    std::unique_ptr<BTreePage> inline getBtreePage(page_id_t pid) {
+        return std::make_unique<BTreePage>(fetch_bpm_page(pid, bpm)->data);
+    }
+
     // Updates provided node's contents(data) in the buffer pool and flushes it to disk
     inline static void flush_node(page_id_t node_pid, u8 *data, BufferPoolManager *bpm) {
         auto bpm_page = fetch_bpm_page(node_pid, bpm);
@@ -118,11 +127,12 @@ struct BTree {
 
     // Returns a vector of node's values, type of which depends on the node type (leaf/internal)
     TREE_NODE_FUNC_TYPE inline std::vector<VAL_T> &getValues(std::unique_ptr<BTreePage> &node) {
-        if constexpr(std::same_as<VAL_T, RID>)
+        if constexpr (std::same_as<VAL_T, RID>)
             return LEAF_RECORDS(node->values);
         else
             return INTERNAL_CHILDREN(node->values);
     }
+
     //--------------------------------------------------------------------------------------------------------------------------------
 };
 

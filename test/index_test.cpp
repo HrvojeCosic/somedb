@@ -21,8 +21,8 @@ class IndexTestFixture : public testing::Test {
     size_t keys_length;
     std::vector<BTreeKey> keys;
     std::vector<RID> vals;
-    std::string keys_data[100] = {"A", "B", "D", "E", "C", "F", "G", "H", "I", "J",
-                                  "K", "L", "M", "N", "O", "P", "Q", "R", "S"};
+    std::string keys_data[30] = {"A", "B", "D", "E", "C", "F", "G", "H", "I", "J",
+                                 "K", "L", "M", "N", "O", "P", "Q", "R", "S"};
 
     void SetUp() override {
         // Table setup
@@ -198,7 +198,7 @@ TEST_F(IndexTestFixture, InsertTest_Splits) {
     for (int i = 7; i < 13; i++) // until "M", which triggers leaf + root split
         tree->insert(keys[i], vals[i]);
 
-    // ROOT and FIRST LEVEL
+    // ROOT and SECOND LEVEL
     curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
     left_node = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(0), tree->bpm)->data);
     right_node = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
@@ -208,7 +208,7 @@ TEST_F(IndexTestFixture, InsertTest_Splits) {
     EXPECT_EQ(left_node->keys == left_node_keys, true);
     EXPECT_EQ(right_node->keys == right_node_keys, true);
 
-    // SECOND LEVEL (LEAF NODES)
+    // THIRD LEVEL (LEAF NODES)
     auto left_left_2 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(left_node->values).at(0), tree->bpm)->data);
     std::vector<BTreeKey> left_left_2_keys = {keys[0], keys[1]}; // A B
     EXPECT_EQ(left_left_2->keys == left_left_2_keys, true);
@@ -255,45 +255,113 @@ TEST_F(IndexTestFixture, RemoveTest_NoMerges) {
 }
 
 TEST_F(IndexTestFixture, RemoveTest_Merges) {
-    auto tree = std::make_unique<BTree>(bpm);
+    auto tree = new BTree(bpm);
     tree->deserialize();
 
-    // Insert elements until there are 4 leaf nodes like this:
-    // (A,B) -> (C,D) -> (E,F) -> (G,H,I)
-    for (int i = 0; i <= 8; i++) { // keys_data[8] = "I"
+    // Insert elements until there are 3 levels (1 root, 1 internal, 1 leaf level)
+    for (int i = 0; i <= 12; i++) { // keys_data[12] = "M"
         tree->insert(keys[i], vals[i]);
     }
 
-    // Remove "I" and "H", leaving last leaf with one element.
-    // Since its previous sibling has two elements at this point, they should merge.
-    // After removal, leaf node level should look like this:
-    // (A,B) -> (C,D) -> (E,F,G)
-    tree->remove(keys[8]);
-    tree->remove(keys[7]);
+    // Remove right most element in leaf node "M", which should trigger merge of last two leaf nodes (since both now
+    // have 2 elements), Which should in turn trigger a merge on the level above (since the two internal nodes combined
+    // now have 3 elements), Which should in turn trigger a merge on the root level since there is now only one internal
+    // node left. Now we should have a tree of 1 less level
+    tree->remove(keys[12]);
     auto curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
-    auto root_vals = INTERNAL_CHILDREN(curr_root->values);
-    auto rightmost_child = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
-    auto last_child = new BTreePage(fetch_bpm_page(root_vals.at(root_vals.size() - 1), tree->bpm)->data);
-    std::vector<BTreeKey> rightmost_child_keys_exp = {keys[3], keys[5], keys[6]}; // E F G
-    EXPECT_EQ(rightmost_child->keys, rightmost_child_keys_exp);
-    std::vector<BTreeKey> last_child_keys_exp = {keys[4], keys[2]}; // C D
-    EXPECT_EQ(last_child->keys, last_child_keys_exp);
+    auto root_0 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(0), tree->bpm)->data);
+    auto root_1 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(1), tree->bpm)->data);
+    auto root_2 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(2), tree->bpm)->data);
+    auto root_3 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(3), tree->bpm)->data);
+    auto root_rightmost = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
+    //-------------
+    std::vector<BTreeKey> root_0_keys_exp = {keys[0], keys[1]}; // A B
+    std::vector<RID> root_0_vals_exp = {vals[0], vals[1]};
+    EXPECT_EQ(root_0->keys, root_0_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_0->values), root_0_vals_exp);
+    //-------------
+    std::vector<BTreeKey> root_1_keys_exp = {keys[4], keys[2]}; // C D
+    std::vector<RID> root_1_vals_exp = {vals[4], vals[2]};
+    EXPECT_EQ(root_1->keys, root_1_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_1->values), root_1_vals_exp);
+    //-------------
+    std::vector<BTreeKey> root_2_keys_exp = {keys[3], keys[5]}; // E F
+    std::vector<RID> root_2_vals_exp = {vals[3], vals[5]};
+    EXPECT_EQ(root_2->keys, root_2_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_2->values), root_2_vals_exp);
+    //-------------
+    std::vector<BTreeKey> root_3_keys_exp = {keys[6], keys[7]}; // G H
+    std::vector<RID> root_3_vals_exp = {vals[6], vals[7]};
+    EXPECT_EQ(root_3->keys, root_3_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_3->values), root_3_vals_exp);
+    //-------------
+    std::vector<BTreeKey> root_rightmost_keys_exp = {keys[8], keys[9], keys[10], keys[11]}; // I J K L
+    std::vector<RID> root_rightmost_vals_exp = {vals[8], vals[9], vals[10], vals[11]};
+    EXPECT_EQ(root_rightmost->keys, root_rightmost_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_rightmost->values), root_rightmost_vals_exp);
+    //-------------
 
-    // Remove "G" 
-    // Now ("C" D") and ("E" "F") should merge, so leaf level looks like:
-    // ("A", "B") -> ("C", "D", "E", "F").
-    // With only one key in the root ("C") and two pointers
-    tree->remove(keys[6]);
+    // Remove "K" and "L", leaving last leaf with two elements.
+    // Since its previous sibling ("G" "H") has two elements at this point, they should merge.
+    // After removal, leaf node level should look like this:
+    // (A,B) -> (C,D) -> (E,F) -> (G,H,I,J)
+    tree->remove(keys[10]);
+    tree->remove(keys[11]);
     curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
-    root_vals = INTERNAL_CHILDREN(curr_root->values);
-    EXPECT_EQ(curr_root->keys.size(), 1);
-    EXPECT_EQ(root_vals.size(), 1);
-    rightmost_child = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
-    last_child = new BTreePage(fetch_bpm_page(root_vals.at(root_vals.size() - 1), tree->bpm)->data);
-    rightmost_child_keys_exp = {keys[4], keys[2], keys[3], keys[5]}; // C D E F
+    EXPECT_EQ(curr_root->keys.size(), 3);
+    auto root_vals = INTERNAL_CHILDREN(curr_root->values);
+    // just check the rightmost child at this stage since the rest are not changed
+    auto rightmost_child = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
+    std::vector<BTreeKey> rightmost_child_keys_exp = {keys[6], keys[7], keys[8], keys[9]}; // G H I J
     EXPECT_EQ(rightmost_child->keys, rightmost_child_keys_exp);
-    last_child_keys_exp = {keys[0], keys[1]}; // A B
-    EXPECT_EQ(last_child->keys, last_child_keys_exp);
+
+    // Remove "I" and "J", this should trigger another leaf merge
+    // Now leaf level should look like:
+    // (A,B) -> (C,D) -> (E,F,G,H)
+    tree->remove(keys[8]);
+    tree->remove(keys[9]);
+    curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
+    EXPECT_EQ(curr_root->keys.size(), 2);
+    root_rightmost = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
+    root_rightmost_keys_exp = {keys[3], keys[5], keys[6], keys[7]}; // E F G H
+    root_rightmost_vals_exp = {vals[3], vals[5], vals[6], vals[7]};
+    EXPECT_EQ(root_rightmost->keys, root_rightmost_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_rightmost->values), root_rightmost_vals_exp);
+
+    // Remove "A", "B", "D"
+    // Now there should be two leaf nodes since last one is full (no merge with first)
+    // (C) -> (E,F,G,H)
+    tree->remove(keys[0]);
+    tree->remove(keys[1]);
+    tree->remove(keys[2]);
+    curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
+    root_0 = new BTreePage(fetch_bpm_page(INTERNAL_CHILDREN(curr_root->values).at(0), tree->bpm)->data);
+    root_rightmost = new BTreePage(fetch_bpm_page(curr_root->rightmost_ptr, tree->bpm)->data);
+    root_0_keys_exp = {keys[4]}; // C
+    root_0_vals_exp = {vals[4]};
+    root_rightmost_keys_exp = {keys[3], keys[5], keys[6], keys[7]}; // E F G H
+    root_rightmost_vals_exp = {vals[3], vals[5], vals[6], vals[7]};
+    EXPECT_EQ(rightmost_child->keys, rightmost_child_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_rightmost->values), root_rightmost_vals_exp);
+    EXPECT_EQ(root_0->keys, root_0_keys_exp);
+    EXPECT_EQ(LEAF_RECORDS(root_0->values), root_0_vals_exp);
+
+    // Remove "H"
+    // This should trigger a merge, leaving the tree with a single leaf node that becomes root
+    tree->remove(keys[7]);
+    curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
+    std::vector<BTreeKey> root_keys_exp = {keys[4], keys[3], keys[5], keys[6]}; // C E F G
+    EXPECT_EQ(curr_root->keys, root_keys_exp);
+    EXPECT_EQ(curr_root->values.index(), 0);
+
+    // Remove the remaining elements
+    tree->remove(keys[6]);
+    tree->remove(keys[5]);
+    tree->remove(keys[3]);
+    tree->remove(keys[4]);
+    curr_root = new BTreePage(fetch_bpm_page(tree->root_pid, tree->bpm)->data);
+    EXPECT_EQ(curr_root->keys.size(), 0);
+    EXPECT_EQ(LEAF_RECORDS(curr_root->values).size(), 0);
 }
 
 int main(int argc, char **argv) {

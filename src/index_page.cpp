@@ -39,8 +39,6 @@ u8 *BTreePage::serialize() const {
             val_size += RID_SIZE;
         } else {
             auto children = INTERNAL_CHILDREN(values);
-            if (children.size() == (uint)i)
-                continue;
             encode_uint32(children.at(i), val_buf);
             val_size += sizeof(u32);
         }
