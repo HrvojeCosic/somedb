@@ -22,7 +22,7 @@
 				"program": "${workspaceRoot}"
 			},
 
-			"preLaunchTask": "build",
+			"preLaunchTask": "build test",
 			"postDebugTask": "cleanup"
 		}
 	]

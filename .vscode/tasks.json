@@ -2,12 +2,9 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "build",
+			"label": "build test",
 			"type": "shell",
-			"command": "make",
-			"args": [
-				"test"
-			],
+			"command": "make test || rm -rf db_files", // run the rm command even on shell errors 
 		},
 		//-------------------------------------------------------------------------
 		{
@@ -20,7 +17,7 @@
 			"label": "remove_dbdir",
 			"type": "shell",
 			"command": "rm -rf db_files",
-		}
+		},
 		//-------------------------------------------------------------------------
 	]
 }
