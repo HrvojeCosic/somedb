@@ -20,6 +20,7 @@
  */
 #pragma once
 #include "bpm.h"
+#include <memory>
 #include <stack>
 #include <variant>
 #include <vector>
@@ -105,6 +106,28 @@ struct BTreePage {
     TREE_NODE_FUNC_TYPE void insertIntoNode(const BTreeKey &key, VAL_T val);
 
     //--------------------------------------------------------------------------------------------------------------------------------
+};
+
+// Information about the node and its local associates, and their in memory and on disk representations/identifiers
+struct BTreePageLocalInfo {
+    std::unique_ptr<BTreePage> node;
+    page_id_t node_pid;
+
+    std::unique_ptr<BTreePage> sibling;
+    page_id_t sibling_pid;
+
+    std::unique_ptr<BTreePage> parent;
+    page_id_t parent_pid;
+
+    BTreePageLocalInfo(std::unique_ptr<BTreePage> node, page_id_t node_pid, std::unique_ptr<BTreePage> sibling,
+                       page_id_t sibling_pid, std::unique_ptr<BTreePage> parent, page_id_t parent_pid) {
+        this->node = std::move(node);
+        this->sibling = std::move(sibling);
+        this->parent = std::move(parent);
+        this->node_pid = node_pid;
+        this->sibling_pid = sibling_pid;
+        this->parent_pid = parent_pid;
+    }
 };
 
 } // namespace somedb
