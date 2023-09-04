@@ -120,14 +120,9 @@ struct BTreePageLocalInfo {
     page_id_t parent_pid;
 
     BTreePageLocalInfo(std::unique_ptr<BTreePage> node, page_id_t node_pid, std::unique_ptr<BTreePage> sibling,
-                       page_id_t sibling_pid, std::unique_ptr<BTreePage> parent, page_id_t parent_pid) {
-        this->node = std::move(node);
-        this->sibling = std::move(sibling);
-        this->parent = std::move(parent);
-        this->node_pid = node_pid;
-        this->sibling_pid = sibling_pid;
-        this->parent_pid = parent_pid;
-    }
+                       page_id_t sibling_pid, std::unique_ptr<BTreePage> parent, page_id_t parent_pid)
+        : node(std::move(node)), node_pid(node_pid), sibling(std::move(sibling)), sibling_pid(sibling_pid),
+          parent(std::move(parent)), parent_pid(parent_pid){};
 };
 
 } // namespace somedb
