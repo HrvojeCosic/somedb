@@ -10,7 +10,7 @@ void Lexer::nextToken(Token &token) {
 
     switch (curr_ch) {
     case '=':
-        token.type = ASSIGN;
+        token.type = EQUALS;
         token.literal = curr_ch;
         break;
     case '+':
@@ -49,9 +49,29 @@ void Lexer::nextToken(Token &token) {
         token.type = RBRACE;
         token.literal = curr_ch;
         break;
+    case '>':
+        if (peekNext() == '=') {
+            readChar();
+            token.type = GT_EQ;
+            token.literal = ">=";
+        } else {
+            token.type = GT;
+            token.literal = curr_ch;
+        }
+        break;
+    case '<':
+        if (peekNext() == '=') {
+            readChar();
+            token.type = LT_EQ;
+            token.literal = "<=";
+        } else {
+            token.type = LT;
+            token.literal = curr_ch;
+        }
+        break;
     case '\0':
         token.type = END;
-        token.literal = curr_ch;
+        token.literal = "\0";
         break;
     default:
         if (isLetter()) {

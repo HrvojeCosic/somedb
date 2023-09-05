@@ -1,4 +1,5 @@
 #include "./shared.h"
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -11,7 +12,7 @@ enum TokenType {
     IDENTIFIER,
     INT,
     STRING,
-    ASSIGN,
+    EQUALS,
     PLUS,
     MINUS,
     COMMA,
@@ -21,12 +22,18 @@ enum TokenType {
     RPAREN,
     LBRACE,
     RBRACE,
+    LT,
+    GT,
+    LT_EQ,
+    GT_EQ,
     END
 };
 
 struct Token {
     TokenType type;
     std::string literal;
+    static constexpr std::array<const char *, 8> keywords = {"SELECT", "UPDATE", "DELETE", "INSERT",
+                                                             "WHERE",  "FROM",   "AS",     "OR"};
 
     Token(){};
     Token(TokenType type, std::string literal) : type(type), literal(literal){};
@@ -34,10 +41,9 @@ struct Token {
     bool operator==(const Token &other) const { return type == other.type && literal == other.literal; }
 
     /* Determines whether the string is keyword or an identifier and returns that type */
-    static inline TokenType getStringType(std::string &str) {
-        std::unordered_map<std::string, bool> keywords = {{"SELECT", 1}, {"UPDATE", 1}, {"DELETE", 1}, {"INSERT", 1},
-                                                          {"WHERE", 1},  {"FROM", 1},   {"AS", 1}};
-        return keywords.contains(str) ? KEYWORD : IDENTIFIER;
+    constexpr static inline TokenType getStringType(std::string &str) {
+        auto find_res = std::find(keywords.begin(), keywords.end(), str);
+        return find_res == std::end(keywords) ? IDENTIFIER : KEYWORD;
     }
 };
 
@@ -68,11 +74,16 @@ struct Lexer {
         ahead_position++;
     };
 
+    /* Returns the next char if there is one without modifying the lexer state */
+    inline char peekNext() {
+        return (ahead_position >= input.size() ? '\0' : input.at(ahead_position));
+    };
+
     /* Moves current char past whitespace */
     inline void eatWhitespace() {
         while (curr_ch == ' ' || curr_ch == '\n' || curr_ch == '\t' || curr_ch == '\r')
             readChar();
-    }
+    };
 };
 
 } // namespace somedb
