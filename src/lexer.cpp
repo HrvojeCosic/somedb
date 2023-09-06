@@ -33,6 +33,10 @@ void Lexer::nextToken(Token &token) {
         token.type = ASTERISK;
         token.literal = curr_ch;
         break;
+    case '/':
+        token.type = SLASH;
+        token.literal = curr_ch;
+        break;
     case '(':
         token.type = LPAREN;
         token.literal = curr_ch;

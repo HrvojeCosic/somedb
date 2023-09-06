@@ -1,6 +1,9 @@
+#pragma once
+
 #include "./shared.h"
 #include <algorithm>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -18,6 +21,7 @@ enum TokenType {
     COMMA,
     SEMICOLON,
     ASTERISK,
+    SLASH,
     LPAREN,
     RPAREN,
     LBRACE,
@@ -58,6 +62,7 @@ struct Lexer {
     /* Returns the token of the current char through the out param TOKEN */
     void nextToken(Token &token);
 
+  private:
     /* Checks if current char is a letter */
     inline bool isLetter() {
         return ((curr_ch >= 'a' && curr_ch <= 'z') || (curr_ch >= 'A' && curr_ch <= 'Z') || curr_ch == '_');
@@ -75,9 +80,7 @@ struct Lexer {
     };
 
     /* Returns the next char if there is one without modifying the lexer state */
-    inline char peekNext() {
-        return (ahead_position >= input.size() ? '\0' : input.at(ahead_position));
-    };
+    inline char peekNext() { return (ahead_position >= input.size() ? '\0' : input.at(ahead_position)); };
 
     /* Moves current char past whitespace */
     inline void eatWhitespace() {
