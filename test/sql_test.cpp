@@ -61,5 +61,9 @@ TEST_F(SqlTestFixture, ParseTest) {
     auto in2 = "1 * 2 + 3";
     auto out2 = parse(in2);
     TestSqlBinaryExpr(out2, "1*2", "+", "3");
+
+    auto in3 = "1 * (2 + 3)";
+    auto out3 = parse(in3);
+    TestSqlBinaryExpr(out3, "1", "*", "2+3");
 }
 } // namespace somedb

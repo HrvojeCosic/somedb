@@ -19,6 +19,11 @@ std::unique_ptr<SqlExpr> Parser::parsePrefix() {
     switch (tok.type) {
     case INT:
         return std::make_unique<SqlIdentifier>(tok.literal);
+    case LPAREN: {
+        auto expr = parse();
+        nextTokenPos(); // consume the right paren
+        return expr;
+    }
     default:
         throw std::runtime_error("Unsupported prefix token");
     }
