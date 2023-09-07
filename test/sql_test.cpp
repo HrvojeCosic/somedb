@@ -1,6 +1,7 @@
 #include "../include/sql/expression.hpp"
 #include "../include/sql/lexer.hpp"
 #include "../include/sql/parser.hpp"
+#include <array>
 #include <gtest/gtest.h>
 #include <memory>
 
@@ -12,14 +13,14 @@ class SqlTestFixture : public testing::Test {
 
     void TearDown() override {}
 
-    inline void TestNextToken(Token expected, Lexer &lexer) {
+    void TestNextToken(Token expected, Lexer &lexer) {
         std::unique_ptr<Token> actual = std::make_unique<Token>();
         lexer.nextToken(*actual);
         EXPECT_EQ(expected, *actual);
     };
 
-    inline void TestSqlBinaryExpr(std::unique_ptr<SqlExpr> &parsed, const std::string &exp_left,
-                                  const std::string &exp_op, const std::string &exp_right) {
+    void TestSqlBinaryExpr(std::unique_ptr<SqlExpr> &parsed, const std::string &exp_left, const std::string &exp_op,
+                           const std::string &exp_right) {
         auto &actual = dynamic_cast<SqlBinaryExpr &>(*parsed);
 
         EXPECT_EQ(actual.left->toString(), exp_left);
@@ -27,7 +28,22 @@ class SqlTestFixture : public testing::Test {
         EXPECT_EQ(actual.right->toString(), exp_right);
     };
 
-    inline std::unique_ptr<SqlExpr> parse(std::string input) {
+    void TestSelectStatement(std::unique_ptr<SqlExpr> &parsed, std::vector<std::string> exp_projection,
+                             std::string exp_tab_name, std::string exp_selection) {
+        auto &actual = dynamic_cast<SqlSelect &>(*parsed);
+
+        EXPECT_EQ(actual.table_name, exp_tab_name);
+
+        // dont compare if there is no selection specified
+        if (actual.selection.has_value()) {
+            EXPECT_EQ(actual.selection->get()->toString(), exp_selection);
+        }
+
+        for (uint i = 0; i < actual.projection.size(); i++)
+            EXPECT_EQ(actual.projection.at(i)->toString(), exp_projection.at(i));
+    };
+
+    std::unique_ptr<SqlExpr> parse(std::string input) {
         Lexer lexer(input);
         Parser parser(lexer);
         return parser.parse();
@@ -54,16 +70,19 @@ TEST_F(SqlTestFixture, LexTest) {
 }
 
 TEST_F(SqlTestFixture, ParseTest) {
-    auto in1 = "1 + 2 * 3";
-    auto out1 = parse(in1);
+    auto out1 = parse("1 + 2 * 3");
     TestSqlBinaryExpr(out1, "1", "+", "2*3");
 
-    auto in2 = "1 * 2 + 3";
-    auto out2 = parse(in2);
+    auto out2 = parse("1 * 2 + 3");
     TestSqlBinaryExpr(out2, "1*2", "+", "3");
 
-    auto in3 = "1 * (2 + 3)";
-    auto out3 = parse(in3);
+    auto out3 = parse("1 * (2 + 3)");
     TestSqlBinaryExpr(out3, "1", "*", "2+3");
+
+    auto out4 = parse("SELECT * FROM foo");
+    TestSelectStatement(out4, std::vector<std::string>{"*"}, "foo", "");
+
+    auto out5 = parse("SELECT some_col, other_col FROM foo WHERE some_col <= 10");
+    TestSelectStatement(out5, std::vector<std::string>{"some_col", "other_col"}, "foo", "some_col<=10");
 }
 } // namespace somedb

@@ -21,9 +21,15 @@ struct Parser {
     /* Parses the next infix expression from tokens */
     std::unique_ptr<SqlExpr> parseInfix(std::unique_ptr<SqlExpr> left, uint precedence);
 
+    /* Parses the select statement */
+    std::unique_ptr<SqlSelect> parseSelectStatement();
+
   private:
     /* Calculates the precedence value of the next token */
     uint nextPrecedence();
+
+    /* Populates the given projection list from current place in the token stream */
+    void populateProjectionList(std::vector<std::unique_ptr<SqlExpr>> &plist);
 
     /* Consumes next token and returns its position, or -1 if there is no token remaining */
     inline int nextTokenPos() { return position < (int)tokens.size() ? ++position : -1; };

@@ -1,5 +1,6 @@
 #include "../../include/sql/parser.hpp"
 #include "../../include/sql/expression.hpp"
+#include <iostream>
 
 namespace somedb {
 
@@ -17,6 +18,7 @@ std::unique_ptr<SqlExpr> Parser::parsePrefix() {
     auto tok = tokens.at(nextTokenPos());
 
     switch (tok.type) {
+    case IDENTIFIER:
     case INT:
         return std::make_unique<SqlIdentifier>(tok.literal);
     case LPAREN: {
@@ -24,6 +26,11 @@ std::unique_ptr<SqlExpr> Parser::parsePrefix() {
         nextTokenPos(); // consume the right paren
         return expr;
     }
+    case KEYWORD:
+        if (tok.literal == "SELECT")
+            return parseSelectStatement();
+        else
+            return parseSelectStatement(); // TODO: SUPPORT OTHER KEYWORDS (this is just to avoid a warning)
     default:
         throw std::runtime_error("Unsupported prefix token");
     }
@@ -37,6 +44,7 @@ std::unique_ptr<SqlExpr> Parser::parseInfix(std::unique_ptr<SqlExpr> left, uint 
     case MINUS:
     case ASTERISK:
     case SLASH:
+    case EQUALS:
     case LT:
     case GT:
     case GT_EQ:
@@ -45,6 +53,43 @@ std::unique_ptr<SqlExpr> Parser::parseInfix(std::unique_ptr<SqlExpr> left, uint 
         return std::make_unique<SqlBinaryExpr>(std::move(left), tok.literal, parse(precedence));
     default:
         throw std::runtime_error("Unsupported infix token");
+    }
+};
+
+std::unique_ptr<SqlSelect> Parser::parseSelectStatement() {
+    auto table_name = std::string();
+    auto projection = std::vector<std::unique_ptr<SqlExpr>>();
+    auto select_tok = tokens.at(position);
+
+    populateProjectionList(projection);
+
+    // Set the table name
+    if (tokens.at(nextTokenPos()).literal != "FROM")
+        throw std::runtime_error("Invalid SELECT statement near: " + tokens.at(position).literal);
+    table_name = tokens.at(nextTokenPos()).literal;
+
+    auto select_statement = std::make_unique<SqlSelect>(table_name, projection);
+
+    // Optionally, set the selection expression
+    if (peekTokenPos() != -1 && tokens.at(peekTokenPos()).literal == "WHERE") {
+        nextTokenPos(); // consume
+        select_statement->selection = parse();
+    }
+
+    return select_statement;
+};
+
+void Parser::populateProjectionList(std::vector<std::unique_ptr<SqlExpr>> &plist) {
+    auto peek = tokens.at(peekTokenPos());
+    if (peek.type != ASTERISK && peek.type != IDENTIFIER) {
+        throw std::runtime_error("Projection needs to start with identifier or *, but started with " + peek.literal);
+    }
+
+    // consume first projection param
+    plist.emplace_back(std::make_unique<SqlIdentifier>(tokens.at(nextTokenPos()).literal));
+    while (tokens.at(peekTokenPos()).type == COMMA) {
+        nextTokenPos(); // consume comma
+        plist.emplace_back(std::make_unique<SqlIdentifier>(tokens.at(nextTokenPos()).literal));
     }
 };
 
