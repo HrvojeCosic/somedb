@@ -2,8 +2,8 @@
 #### GENERAL VARIABLES
 #=================================================================================================================
 BINARY=      bin
-VPATH=       src src/disk src/index src/sql src/utils
-INCDIR=      ./include
+VPATH=       . src src/disk src/index src/sql src/utils
+INCDIRS=     . ./include ./include/disk ./include/index ./include/sql  ./include/utils
 TEST_DIR=    test
 BUILD_DIR=   build
 CXX=         g++
@@ -14,7 +14,7 @@ DBFILES_DIR= db_files
 #=================================================================================================================
 #### FLAGS & FILES
 #=================================================================================================================
-CFLAGS=-Wall -Wextra -Wno-missing-braces -g -I $(INCDIR) $(OPT) $(DEPFLAGS)
+CFLAGS=-Wall -Wextra -Wno-missing-braces -g $(foreach dir,$(INCDIRS),-I$(dir)) $(OPT) $(DEPFLAGS)
 
 #Generate files including make rules for .h deps
 DEPFLAGS=-MP -MD
@@ -23,7 +23,7 @@ CFILES=$(foreach dir, $(VPATH), $(wildcard $(dir)/*.c))
 CPPFILES=$(foreach dir, $(VPATH), $(wildcard $(dir)/*.cpp))
 CPPFILES_NO_MAIN=$(filter-out src/main.cpp,$(CPPFILES))
 CFILES_NO_MAIN=$(filter-out src/main.c,$(CFILES))
-HPPFILES=$(wildcard $(INCDIR)/*.hpp)
+HPPFILES=$(foreach dir, $(INCDIRS), $(wildcard $(dir)/*.hpp))
 OFILES_C=$(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(CFILES)))
 OFILES_CPP=$(patsubst %.cpp, $(BUILD_DIR)/%.o, $(notdir $(CPPFILES)))
 DEPFILES=$(patsubst %.c, %.d, $(CFILES)) $(patsubst %.cpp, %.d, $(CPPFILES))

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "clock_replacer.h"
-#include "disk_manager.h"
 #include "../utils/hash.h"
 #include "../utils/shared.h"
+#include "clock_replacer.h"
+#include "disk_manager.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

@@ -26,9 +26,9 @@
 #include <variant>
 #include <vector>
 
+#include "../disk/disk_manager.h"
 #include "../utils/serialize.h"
 #include "../utils/shared.h"
-#include "../disk/disk_manager.h"
 
 #define TREE_NODE_FUNC_TYPE                                                                                            \
     template <typename VAL_T>                                                                                          \

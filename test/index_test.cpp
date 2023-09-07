@@ -1,6 +1,6 @@
 #include "../include/disk/bpm.h"
-#include "../include/index/btree_index.hpp"
 #include "../include/disk/heapfile.h"
+#include "../include/index/btree_index.hpp"
 #include "../include/index/index_page.hpp"
 #include "../include/utils/serialize.h"
 #include <cstring>
@@ -79,7 +79,7 @@ class IndexTestFixture : public testing::Test {
     }
 
     // Insert array of elements in the tree
-    inline void Insert(BTree &tree, std::vector<std::string> keys_to_ins) {
+    void Insert(BTree &tree, std::vector<std::string> keys_to_ins) {
         for (auto key : keys_to_ins) {
             auto idx = key_to_idx.at(key);
             tree.insert(keys[idx], vals[idx]);
@@ -87,7 +87,7 @@ class IndexTestFixture : public testing::Test {
     }
 
     // Fetches the btree page/node of provided pid from the buffer pool and forms a BTreePage object out of it
-    inline BTreePage GetNode(page_id_t pid, BTree tree) { return BTreePage(fetch_bpm_page(pid, tree.bpm)->data); };
+    BTreePage GetNode(page_id_t pid, BTree tree) { return BTreePage(fetch_bpm_page(pid, tree.bpm)->data); };
 };
 
 TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeTree) {

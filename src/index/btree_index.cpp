@@ -1,7 +1,7 @@
 #include "../../include/index/btree_index.hpp"
-#include "../../include/index/btree_strategy.hpp"
 #include "../../include/disk/disk_manager.h"
 #include "../../include/disk/heapfile.h"
+#include "../../include/index/btree_strategy.hpp"
 #include "../../include/index/index_page.hpp"
 #include "../../include/utils/serialize.h"
 #include <algorithm>

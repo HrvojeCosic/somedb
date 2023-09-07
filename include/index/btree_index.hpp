@@ -10,8 +10,8 @@
 
 #pragma once
 #include "../disk/bpm.h"
-#include "index_page.hpp"
 #include "../utils/shared.h"
+#include "index_page.hpp"
 #include <cassert>
 #include <memory>
 #include <string>

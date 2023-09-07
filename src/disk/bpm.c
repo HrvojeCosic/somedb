@@ -1,7 +1,7 @@
 #include "../../include/disk/bpm.h"
 #include "../../include/disk/disk_manager.h"
-#include "../../include/utils/hash.h"
 #include "../../include/disk/heapfile.h"
+#include "../../include/utils/hash.h"
 #include "../../include/utils/serialize.h"
 #include <assert.h>
 #include <errno.h>
