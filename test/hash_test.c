@@ -1,5 +1,5 @@
-#include "../include/hash.h"
-#include "../include/shared.h"
+#include "../include/utils/hash.h"
+#include "../include/utils/shared.h"
 #include <check.h>
 #include <stdint.h>
 #include <stdio.h>

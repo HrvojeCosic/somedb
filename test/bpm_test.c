@@ -1,5 +1,5 @@
-#include "../include/bpm.h"
-#include "../include/heapfile.h"
+#include "../include/disk/bpm.h"
+#include "../include/disk/heapfile.h"
 #include <check.h>
 #include <fcntl.h>
 #include <search.h>

@@ -1,4 +1,4 @@
-#include "../include/clock_replacer.h"
+#include "../include/disk/clock_replacer.h"
 #include <check.h>
 #include <stdint.h>
 #include <stdio.h>

@@ -1,6 +1,6 @@
-#include "../include/expression.hpp"
-#include "../include/lexer.hpp"
-#include "../include/parser.hpp"
+#include "../include/sql/expression.hpp"
+#include "../include/sql/lexer.hpp"
+#include "../include/sql/parser.hpp"
 #include <gtest/gtest.h>
 #include <memory>
 

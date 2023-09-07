@@ -1,4 +1,4 @@
-#include "../../include/lexer.hpp"
+#include "../../include/sql/lexer.hpp"
 #include <string>
 
 namespace somedb {

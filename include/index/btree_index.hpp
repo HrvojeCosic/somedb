@@ -9,9 +9,9 @@
  */
 
 #pragma once
-#include "bpm.h"
+#include "../disk/bpm.h"
 #include "index_page.hpp"
-#include "shared.h"
+#include "../utils/shared.h"
 #include <cassert>
 #include <memory>
 #include <string>

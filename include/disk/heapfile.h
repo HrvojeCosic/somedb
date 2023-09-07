@@ -1,6 +1,6 @@
 #include "disk_manager.h"
-#include "hash.h"
-#include "shared.h"
+#include "../utils/hash.h"
+#include "../utils/shared.h"
 #include <stdint.h>
 
 /*

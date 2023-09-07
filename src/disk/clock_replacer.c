@@ -1,5 +1,5 @@
-#include "../include/clock_replacer.h"
-#include "../include/shared.h"
+#include "../../include/disk/clock_replacer.h"
+#include "../../include/utils/shared.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

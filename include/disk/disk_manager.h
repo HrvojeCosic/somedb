@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hash.h"
-#include "shared.h"
+#include "../utils/hash.h"
+#include "../utils/shared.h"
 #include <stdint.h>
 
 #define PAGE_SIZE 4096

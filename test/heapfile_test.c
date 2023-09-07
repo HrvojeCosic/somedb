@@ -1,6 +1,6 @@
-#include "../include/disk_manager.h"
-#include "../include/heapfile.h"
-#include "../include/serialize.h"
+#include "../include/disk/disk_manager.h"
+#include "../include/disk/heapfile.h"
+#include "../include/utils/serialize.h"
 #include <check.h>
 #include <dirent.h>
 #include <fcntl.h>

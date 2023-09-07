@@ -1,5 +1,5 @@
-#include "../../include/parser.hpp"
-#include "../../include/expression.hpp"
+#include "../../include/sql/parser.hpp"
+#include "../../include/sql/expression.hpp"
 
 namespace somedb {
 

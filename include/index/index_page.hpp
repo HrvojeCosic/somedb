@@ -19,16 +19,16 @@
  *  (32 bit uint OR 2x32 bit uint) child pointer OR RID=(page_id, slot_num)
  */
 #pragma once
-#include "bpm.h"
+#include "../disk/bpm.h"
 #include <cstring>
 #include <memory>
 #include <stack>
 #include <variant>
 #include <vector>
 
-#include "./serialize.h"
-#include "./shared.h"
-#include "disk_manager.h"
+#include "../utils/serialize.h"
+#include "../utils/shared.h"
+#include "../disk/disk_manager.h"
 
 #define TREE_NODE_FUNC_TYPE                                                                                            \
     template <typename VAL_T>                                                                                          \

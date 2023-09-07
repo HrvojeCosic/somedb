@@ -1,4 +1,4 @@
-#include "../include/serialize.h"
+#include "../../include/utils/serialize.h"
 
 void encode_uint32(uint32_t data, uint8_t *buf) {
     buf[0] = (data >> 24) & 0xFF;

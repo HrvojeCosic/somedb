@@ -1,5 +1,5 @@
-#include "../../include/hash.h"
-#include "../../include/shared.h"
+#include "../../include/utils/hash.h"
+#include "../../include/utils/serialize.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>

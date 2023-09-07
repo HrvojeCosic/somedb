@@ -1,8 +1,8 @@
-#include "../include/bpm.h"
-#include "../include/btree_index.hpp"
-#include "../include/heapfile.h"
-#include "../include/index_page.hpp"
-#include "../include/serialize.h"
+#include "../include/disk/bpm.h"
+#include "../include/index/btree_index.hpp"
+#include "../include/disk/heapfile.h"
+#include "../include/index/index_page.hpp"
+#include "../include/utils/serialize.h"
 #include <cstring>
 #include <gtest/gtest.h>
 #include <string>

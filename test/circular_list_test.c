@@ -1,4 +1,4 @@
-#include "../include/circular_list.h"
+#include "../include/utils/circular_list.h"
 #include <check.h>
 #include <stdio.h>
 #include <stdlib.h>

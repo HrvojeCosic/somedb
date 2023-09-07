@@ -1,9 +1,9 @@
-#include "../../include/btree_index.hpp"
-#include "../../include//btree_strategy.hpp"
-#include "../../include/disk_manager.h"
-#include "../../include/heapfile.h"
-#include "../../include/index_page.hpp"
-#include "../../include/serialize.h"
+#include "../../include/index/btree_index.hpp"
+#include "../../include/index/btree_strategy.hpp"
+#include "../../include/disk/disk_manager.h"
+#include "../../include/disk/heapfile.h"
+#include "../../include/index/index_page.hpp"
+#include "../../include/utils/serialize.h"
 #include <algorithm>
 #include <bits/ranges_util.h>
 #include <cassert>

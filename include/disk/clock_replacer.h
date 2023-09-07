@@ -1,8 +1,8 @@
 #pragma once
 
-#include "./circular_list.h"
-#include "hash.h"
-#include "shared.h"
+#include "../utils/circular_list.h"
+#include "../utils/hash.h"
+#include "../utils/shared.h"
 
 typedef struct {
     size_t num_pages;       // max number of pages ClockReplacer is required to store

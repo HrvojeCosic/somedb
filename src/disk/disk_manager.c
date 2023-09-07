@@ -1,6 +1,6 @@
-#include "../include/disk_manager.h"
-#include "../include/serialize.h"
-#include "../include/shared.h"
+#include "../../include/disk/disk_manager.h"
+#include "../../include/utils/serialize.h"
+#include "../../include/utils/shared.h"
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
