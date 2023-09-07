@@ -20,6 +20,7 @@
  */
 #pragma once
 #include "bpm.h"
+#include <cstring>
 #include <memory>
 #include <stack>
 #include <variant>

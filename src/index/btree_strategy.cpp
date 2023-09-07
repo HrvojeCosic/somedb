@@ -1,6 +1,6 @@
-#include "../include/btree_strategy.hpp"
-#include "../include/btree_index.hpp"
-#include "../include/index_page.hpp"
+#include "../../include/btree_strategy.hpp"
+#include "../../include/btree_index.hpp"
+#include "../../include/index_page.hpp"
 
 namespace somedb {
 void MergeLeafNodeStrategy::merge(BTreePageLocalInfo &local, BTree &tree, std::pair<page_id_t, int> &parent_crumb,

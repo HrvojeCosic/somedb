@@ -1,8 +1,8 @@
-#include "../include/bpm.h"
-#include "../include/disk_manager.h"
-#include "../include/hash.h"
-#include "../include/heapfile.h"
-#include "../include/serialize.h"
+#include "../../include/bpm.h"
+#include "../../include/disk_manager.h"
+#include "../../include/hash.h"
+#include "../../include/heapfile.h"
+#include "../../include/serialize.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
