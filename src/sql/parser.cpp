@@ -4,7 +4,9 @@
 
 namespace somedb {
 
-std::unique_ptr<SqlExpr> Parser::parse(uint precedence) {
+Parser::Parser(Lexer &lexer) : position(-1) { populateTokens(lexer); };
+
+SqlExprRef Parser::parse(uint precedence) {
     auto expr = parsePrefix();
 
     while (nextPrecedence() > precedence) {
@@ -14,7 +16,7 @@ std::unique_ptr<SqlExpr> Parser::parse(uint precedence) {
     return expr;
 };
 
-std::unique_ptr<SqlExpr> Parser::parsePrefix() {
+SqlExprRef Parser::parsePrefix() {
     auto tok = tokens.at(nextTokenPos());
 
     switch (tok.type) {
@@ -36,7 +38,7 @@ std::unique_ptr<SqlExpr> Parser::parsePrefix() {
     }
 };
 
-std::unique_ptr<SqlExpr> Parser::parseInfix(std::unique_ptr<SqlExpr> left, uint precedence) {
+SqlExprRef Parser::parseInfix(SqlExprRef left, uint precedence) {
     auto tok = tokens.at(peekTokenPos());
 
     switch (tok.type) {
@@ -58,7 +60,7 @@ std::unique_ptr<SqlExpr> Parser::parseInfix(std::unique_ptr<SqlExpr> left, uint 
 
 std::unique_ptr<SqlSelect> Parser::parseSelectStatement() {
     auto table_name = std::string();
-    auto projection = std::vector<std::unique_ptr<SqlExpr>>();
+    auto projection = std::vector<SqlExprRef>();
     auto select_tok = tokens.at(position);
 
     populateProjectionList(projection);
@@ -79,7 +81,7 @@ std::unique_ptr<SqlSelect> Parser::parseSelectStatement() {
     return select_statement;
 };
 
-void Parser::populateProjectionList(std::vector<std::unique_ptr<SqlExpr>> &plist) {
+void Parser::populateProjectionList(std::vector<SqlExprRef> &plist) {
     auto peek = tokens.at(peekTokenPos());
     if (peek.type != ASTERISK && peek.type != IDENTIFIER) {
         throw std::runtime_error("Projection needs to start with identifier or *, but started with " + peek.literal);
@@ -92,6 +94,16 @@ void Parser::populateProjectionList(std::vector<std::unique_ptr<SqlExpr>> &plist
         plist.emplace_back(std::make_unique<SqlIdentifier>(tokens.at(nextTokenPos()).literal));
     }
 };
+
+void Parser::populateTokens(Lexer lexer) {
+    std::unique_ptr<Token> tok = std::make_unique<Token>();
+    lexer.nextToken(*tok);
+
+    while (tok->type != END) {
+        tokens.emplace_back(*tok);
+        lexer.nextToken(*tok);
+    }
+}
 
 uint Parser::nextPrecedence() {
     auto pos = peekTokenPos();
@@ -122,4 +134,5 @@ uint Parser::nextPrecedence() {
         return 0;
     }
 }
+
 } // namespace somedb

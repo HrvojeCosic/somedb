@@ -10,16 +10,16 @@ struct Parser {
     std::vector<Token> tokens;
     int position;
 
-    Parser(Lexer &lexer) : position(-1) { populateTokens(lexer); };
+    Parser(Lexer &lexer);
 
     /* Parses the expression consisting of tokens */
-    std::unique_ptr<SqlExpr> parse(uint precedence = 0);
+    SqlExprRef parse(uint precedence = 0);
 
     /* Parses the next prefix expression from tokens */
-    std::unique_ptr<SqlExpr> parsePrefix();
+    SqlExprRef parsePrefix();
 
     /* Parses the next infix expression from tokens */
-    std::unique_ptr<SqlExpr> parseInfix(std::unique_ptr<SqlExpr> left, uint precedence);
+    SqlExprRef parseInfix(SqlExprRef left, uint precedence);
 
     /* Parses the select statement */
     std::unique_ptr<SqlSelect> parseSelectStatement();
@@ -29,7 +29,7 @@ struct Parser {
     uint nextPrecedence();
 
     /* Populates the given projection list from current place in the token stream */
-    void populateProjectionList(std::vector<std::unique_ptr<SqlExpr>> &plist);
+    void populateProjectionList(std::vector<SqlExprRef> &plist);
 
     /* Consumes next token and returns its position, or -1 if there is no token remaining */
     inline int nextTokenPos() { return position < (int)tokens.size() ? ++position : -1; };
@@ -39,14 +39,6 @@ struct Parser {
 
     /* Populates tokens with tokens from current to last token from the lexer (caller takes care of first token
      * position) */
-    inline void populateTokens(Lexer lexer) {
-        std::unique_ptr<Token> tok = std::make_unique<Token>();
-        lexer.nextToken(*tok);
-
-        while (tok->type != END) {
-            tokens.emplace_back(*tok);
-            lexer.nextToken(*tok);
-        }
-    }
+    void populateTokens(Lexer lexer);
 };
 } // namespace somedb

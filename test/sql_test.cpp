@@ -19,7 +19,7 @@ class SqlTestFixture : public testing::Test {
         EXPECT_EQ(expected, *actual);
     };
 
-    void TestSqlBinaryExpr(std::unique_ptr<SqlExpr> &parsed, const std::string &exp_left, const std::string &exp_op,
+    void TestSqlBinaryExpr(SqlExprRef &parsed, const std::string &exp_left, const std::string &exp_op,
                            const std::string &exp_right) {
         auto &actual = dynamic_cast<SqlBinaryExpr &>(*parsed);
 
@@ -28,8 +28,8 @@ class SqlTestFixture : public testing::Test {
         EXPECT_EQ(actual.right->toString(), exp_right);
     };
 
-    void TestSelectStatement(std::unique_ptr<SqlExpr> &parsed, std::vector<std::string> exp_projection,
-                             std::string exp_tab_name, std::string exp_selection) {
+    void TestSelectStatement(SqlExprRef &parsed, std::vector<std::string> exp_projection, std::string exp_tab_name,
+                             std::string exp_selection) {
         auto &actual = dynamic_cast<SqlSelect &>(*parsed);
 
         EXPECT_EQ(actual.table_name, exp_tab_name);
@@ -43,7 +43,7 @@ class SqlTestFixture : public testing::Test {
             EXPECT_EQ(actual.projection.at(i)->toString(), exp_projection.at(i));
     };
 
-    std::unique_ptr<SqlExpr> parse(std::string input) {
+    SqlExprRef parse(std::string input) {
         Lexer lexer(input);
         Parser parser(lexer);
         return parser.parse();
