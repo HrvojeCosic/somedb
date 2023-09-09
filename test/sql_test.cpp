@@ -1,6 +1,6 @@
-#include "../include/sql/expression.hpp"
 #include "../include/sql/lexer.hpp"
 #include "../include/sql/parser.hpp"
+#include "../include/sql/primitive.hpp"
 #include <array>
 #include <gtest/gtest.h>
 #include <memory>
@@ -49,6 +49,77 @@ class SqlTestFixture : public testing::Test {
         return parser.parse();
     };
 };
+
+TEST_F(SqlTestFixture, PrimitivesTest) {
+    // Boolean tests
+    auto bool_type = std::make_shared<BooleanPrimitiveType>();
+    auto bool_true = std::make_unique<PrimitiveValue>(bool_type, true);
+    auto bool_false = std::make_unique<PrimitiveValue>(bool_type, false);
+
+    EXPECT_EQ(bool_type->equals(*bool_true, *bool_true), CmpState::SQL_TRUE);
+    EXPECT_EQ(bool_type->equals(*bool_true, *bool_false), CmpState::SQL_FALSE);
+    EXPECT_EQ(bool_type->notEquals(*bool_true, *bool_false), CmpState::SQL_TRUE);
+    EXPECT_EQ(bool_type->greaterThan(*bool_true, *bool_false), CmpState::SQL_TRUE);
+    EXPECT_EQ(bool_type->lessThan(*bool_false, *bool_true), CmpState::SQL_TRUE);
+
+    // Varchar tests
+    std::string varchar = "ABCD EFGH IJK foo";
+    std::string varchar_other = "LMNOP QRS TUV bar";
+    auto varchar_type = std::make_shared<VarcharPrimitiveType>();
+    auto varchar_val1 = std::make_unique<PrimitiveValue>(varchar_type, varchar.data(), varchar.length());
+    auto varchar_val2 = std::make_unique<PrimitiveValue>(varchar_type, varchar.data(), varchar.length());
+    auto varchar_val3 = std::make_unique<PrimitiveValue>(varchar_type, varchar_other.data(), varchar_other.length());
+
+    EXPECT_EQ(varchar_type->equals(*varchar_val1, *varchar_val2), CmpState::SQL_TRUE);
+    EXPECT_EQ(varchar_type->equals(*varchar_val1, *varchar_val3), CmpState::SQL_FALSE);
+    EXPECT_EQ(varchar_type->notEquals(*varchar_val1, *varchar_val3), CmpState::SQL_TRUE);
+    EXPECT_EQ(varchar_type->greaterThan(*varchar_val3, *varchar_val1), CmpState::SQL_TRUE);
+    EXPECT_EQ(varchar_type->lessThan(*varchar_val1, *varchar_val3), CmpState::SQL_TRUE);
+
+    // Integer tests
+    auto int_type = std::make_shared<IntegerPrimitiveType>();
+    auto int_val1 = std::make_unique<PrimitiveValue>(int_type, 42);
+    auto int_val2 = std::make_unique<PrimitiveValue>(int_type, 42);
+    auto int_val3 = std::make_unique<PrimitiveValue>(int_type, 100);
+
+    EXPECT_EQ(int_type->equals(*int_val1, *int_val2), CmpState::SQL_TRUE);
+    EXPECT_EQ(int_type->equals(*int_val1, *int_val3), CmpState::SQL_FALSE);
+    EXPECT_EQ(int_type->notEquals(*int_val1, *int_val3), CmpState::SQL_TRUE);
+    EXPECT_EQ(int_type->greaterThan(*int_val3, *int_val1), CmpState::SQL_TRUE);
+    EXPECT_EQ(int_type->lessThan(*int_val1, *int_val3), CmpState::SQL_TRUE);
+
+    // Integer arithmetic tests
+    auto int_result = int_type->add(*int_val1, *int_val3);
+    EXPECT_EQ(int_result.value.integer, 142);
+    int_result = int_type->subtract(*int_val1, *int_val3);
+    EXPECT_EQ(int_result.value.integer, -58);
+    int_result = int_type->multiply(*int_val1, *int_val3);
+    EXPECT_EQ(int_result.value.integer, 4200);
+    int_result = int_type->divide(*int_val3, *int_val1);
+    EXPECT_EQ(int_result.value.integer, 2);
+
+    // Decimal tests
+    auto decimal_type = std::make_shared<DecimalPrimitiveType>();
+    auto decimal_val1 = std::make_unique<PrimitiveValue>(decimal_type, 42.5);
+    auto decimal_val2 = std::make_unique<PrimitiveValue>(decimal_type, 42.5);
+    auto decimal_val3 = std::make_unique<PrimitiveValue>(decimal_type, 100.0);
+
+    EXPECT_EQ(decimal_type->equals(*decimal_val1, *decimal_val2), CmpState::SQL_TRUE);
+    EXPECT_EQ(decimal_type->equals(*decimal_val1, *decimal_val3), CmpState::SQL_FALSE);
+    EXPECT_EQ(decimal_type->notEquals(*decimal_val1, *decimal_val3), CmpState::SQL_TRUE);
+    EXPECT_EQ(decimal_type->greaterThan(*decimal_val3, *decimal_val1), CmpState::SQL_TRUE);
+    EXPECT_EQ(decimal_type->lessThan(*decimal_val1, *decimal_val3), CmpState::SQL_TRUE);
+
+    // Decimal arithmetic tests
+    auto decimal_result = decimal_type->add(*decimal_val1, *decimal_val3);
+    EXPECT_DOUBLE_EQ(decimal_result.value.decimal, 142.5);
+    decimal_result = decimal_type->subtract(*decimal_val1, *decimal_val3);
+    EXPECT_DOUBLE_EQ(decimal_result.value.decimal, -57.5);
+    decimal_result = decimal_type->multiply(*decimal_val1, *decimal_val3);
+    EXPECT_DOUBLE_EQ(decimal_result.value.decimal, 4250.0);
+    decimal_result = decimal_type->divide(*decimal_val3, *decimal_val1);
+    EXPECT_DOUBLE_EQ(decimal_result.value.decimal, 2.3529411764705883);
+}
 
 TEST_F(SqlTestFixture, LexTest) {
     std::string input = "SELECT * FROM some_table WHERE some_col = 123 OR some_other_col <= 321;";

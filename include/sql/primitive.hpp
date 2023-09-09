@@ -11,6 +11,7 @@ enum CmpState { SQL_TRUE, SQL_FALSE };
 struct PrimitiveValue;
 struct PrimitiveType;
 
+//--------------------------------------------------------------------------------------------------------------------------------
 using PrimitiveTypeRef = std::shared_ptr<PrimitiveType>;
 
 /*
@@ -20,6 +21,7 @@ using PrimitiveTypeRef = std::shared_ptr<PrimitiveType>;
 struct PrimitiveType {
     virtual ~PrimitiveType() = default;
 
+    // Asserts that the two types being evaluated against each other are of the same type
     void assertTypesEqual(const PrimitiveValue &l, const PrimitiveValue &r) const;
 
     // Checks if left and right values are equal
@@ -106,5 +108,7 @@ struct PrimitiveValue {
 
     inline std::string toString() const { return type->toString(); };
 };
+
+//--------------------------------------------------------------------------------------------------------------------------------
 
 } // namespace somedb
