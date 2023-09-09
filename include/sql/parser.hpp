@@ -1,7 +1,8 @@
 #pragma once
 
-#include "./expression.hpp"
 #include "./lexer.hpp"
+#include "./primitive.hpp"
+#include "./sql_expression.hpp"
 #include <optional>
 
 namespace somedb {

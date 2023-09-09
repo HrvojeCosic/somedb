@@ -19,6 +19,8 @@ typedef uint32_t frame_id_t;
 typedef uint32_t u32;
 typedef uint16_t u16;
 typedef uint8_t u8;
+typedef int32_t i32;
+typedef int64_t i64;
 
 enum PageType { HEAP_PAGE = 1, BTREE_INDEX_PAGE = 2, INVALID = 0 };
 
