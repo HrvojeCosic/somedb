@@ -92,6 +92,8 @@ struct PrimitiveValue {
 
     u16 length; // for str type
 
+    PrimitiveValue(){};
+
     PrimitiveValue(PrimitiveTypeRef type, u8 b) : type(std::move(type)) { value = {.boolean = b}; };
 
     PrimitiveValue(PrimitiveTypeRef type, int32_t i) : type(std::move(type)) { value = {.integer = i}; };

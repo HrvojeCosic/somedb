@@ -13,16 +13,24 @@ struct AccessMethod;
 using AccessMethodRef = std::unique_ptr<AccessMethod>;
 
 struct AccessMethod {
+    std::string path;
+
+    AccessMethod(std::string path) : path(path){};
     virtual ~AccessMethod() = default;
+
     virtual Table schema() const = 0;
-    virtual std::vector<std::string> scan() const = 0; // TODO: actual rows, not strings
+    virtual std::vector<Row> scan() const = 0; 
 };
 
 struct HeapfileAccess : AccessMethod {
-    std::vector<std::string> scan() const { throw std::runtime_error("TODO: Heapfile scan implementation"); };
+    HeapfileAccess(std::string table_name) : AccessMethod(table_name){};
+
+    std::vector<Row> scan() const override { throw std::runtime_error("TODO: Heapfile scan implementation"); };
+
+    Table schema() const override;
 };
 
 struct BTreeIndexAccess : AccessMethod {
-    std::vector<std::string> scan() const { throw std::runtime_error("TODO: B+tree index scan implementation"); };
+    std::vector<Row> scan() const { throw std::runtime_error("TODO: B+tree index scan implementation"); };
 };
 } // namespace somedb

@@ -184,6 +184,7 @@ void *add_tuple(void *data_args) {
             break;
         case BOOLEAN:
             tuple_size += sizeof(bool);
+            break;
         }
     }
 

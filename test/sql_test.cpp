@@ -1,3 +1,4 @@
+#include "../include/disk/heapfile.h"
 #include "../include/sql/lexer.hpp"
 #include "../include/sql/logical_plan.hpp"
 #include "../include/sql/parser.hpp"
@@ -12,7 +13,26 @@ class SqlTestFixture : public testing::Test {
   protected:
     void SetUp() override {}
 
-    void TearDown() override {}
+    void TearDown() override { remove_table("test_table"); }
+
+    void SetupTable() {
+        char x[4] = "foo";
+        char y[4] = "bar";
+        ::Column cols[2] = {{.name_len = 3, .name = x, .type = VARCHAR}, {.name_len = 3, .name = y, .type = DECIMAL}};
+        const char *col_names[2] = {"foo", "bar"};
+        ColumnType col_types[2] = {VARCHAR, DECIMAL};
+        ColumnValue col_vals[2] = {{.varchar = "Baz"}, {.decimal = 123.12}};
+        TuplePtr *t_ptr = (TuplePtr *)malloc(sizeof(TuplePtr));
+        DiskManager *disk_mgr = create_table("test_table", cols, 2);
+        new_heap_page(disk_mgr);
+        AddTupleArgs t_args = {.disk_manager = disk_mgr,
+                               .column_names = col_names,
+                               .column_values = col_vals,
+                               .column_types = col_types,
+                               .num_columns = 1,
+                               .tup_ptr_out = t_ptr};
+        add_tuple(&t_args);
+    };
 
     void TestNextToken(Token expected, Lexer &lexer) {
         std::unique_ptr<Token> actual = std::make_unique<Token>();
@@ -51,6 +71,9 @@ class SqlTestFixture : public testing::Test {
     };
 };
 
+// -----------------------------------------------------------------------------------------------------
+// TYPES
+// -----------------------------------------------------------------------------------------------------
 TEST_F(SqlTestFixture, PrimitivesTest) {
     // Boolean tests
     auto bool_type = std::make_shared<BooleanPrimitiveType>();
@@ -122,6 +145,9 @@ TEST_F(SqlTestFixture, PrimitivesTest) {
     EXPECT_DOUBLE_EQ(decimal_result.value.decimal, 2.3529411764705883);
 }
 
+// -----------------------------------------------------------------------------------------------------
+// LEXER/PARSER
+// -----------------------------------------------------------------------------------------------------
 TEST_F(SqlTestFixture, LexTest) {
     std::string input = "SELECT * FROM some_table WHERE some_col = 123 OR some_other_col <= 321;";
     Lexer lexer(input);
@@ -158,9 +184,25 @@ TEST_F(SqlTestFixture, ParseTest) {
     TestSelectStatement(out5, std::vector<std::string>{"some_col", "other_col"}, "foo", "some_col<=10");
 }
 
+
+// -----------------------------------------------------------------------------------------------------
+// LOGICAL OPERATORS
+// -----------------------------------------------------------------------------------------------------
 TEST_F(SqlTestFixture, LogicalScanTest) {
-    //    HeapfileAccess heapfile_acc();
-    //    LogicalScan scan()
+    SetupTable();
+    AccessMethodRef heapfile_acc = std::make_unique<HeapfileAccess>("test_table");
+    LogicalScan scan(std::move(heapfile_acc));
+
+    Table actual_schema = scan.schema();
+
+    auto type_foo = dynamic_cast<VarcharPrimitiveType &>(*actual_schema.columns[0].data_type);
+    auto type_bar = dynamic_cast<DecimalPrimitiveType &>(*actual_schema.columns[1].data_type);
+    Column col_foo("foo", std::make_unique<VarcharPrimitiveType>(type_foo));
+    Column col_bar("bar", std::make_unique<DecimalPrimitiveType>(type_bar));
+    
+    Table expected_schema(actual_schema.name, std::vector<Column>{col_foo, col_bar});
+
+    EXPECT_EQ(expected_schema == actual_schema, true); // NOLINT
 }
 
 } // namespace somedb

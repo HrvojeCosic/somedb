@@ -1,3 +1,6 @@
+#include <stdexcept>
+#include <string>
+
 #include "../../include/sql/logical_expression.hpp"
 
 namespace somedb {
@@ -6,16 +9,23 @@ PrimitiveValue BinaryLogicalExpr::evaluate(Row &row, Table &table) {
     const PrimitiveValue lhs = children.at(0)->evaluate(row, table);
     const PrimitiveValue rhs = children.at(1)->evaluate(row, table);
 
+    PrimitiveValue res;
     switch (op) {
     case ADD:
-        return lhs.type->add(lhs, rhs);
+        res = lhs.type->add(lhs, rhs);
+        break;
     case SUBTRACT:
-        return lhs.type->subtract(lhs, rhs);
+        res = lhs.type->subtract(lhs, rhs);
+        break;
     case MULTIPLY:
-        return lhs.type->multiply(lhs, rhs);
+        res = lhs.type->multiply(lhs, rhs);
+        break;
     case DIVIDE:
-        return lhs.type->divide(lhs, rhs);
+        res = lhs.type->divide(lhs, rhs);
+        break;
     };
+
+    return res;
 };
 
 std::string BinaryLogicalExpr::toString() const {

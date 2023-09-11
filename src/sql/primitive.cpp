@@ -10,7 +10,7 @@ namespace somedb {
 //--------------------------------------------------------------------------------------------------------------------------------
 std::string PrimitiveType::toString() const { return typeid(this).name(); };
 
-void PrimitiveType::assertTypesEqual(const PrimitiveValue &l, const PrimitiveValue &r) const {
+void PrimitiveType::assertTypesEqual(const PrimitiveValue &l, const PrimitiveValue &) const {
     assert(l.type->toString() == this->toString());
 };
 
