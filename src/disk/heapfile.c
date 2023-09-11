@@ -170,18 +170,20 @@ void *add_tuple(void *data_args) {
     uint16_t tuple_size = 0;
     for (uint8_t i = 0; i < data->num_columns; i++) {
         switch (data->column_types[i]) {
-        case STRING: {
-            const char *str = data->column_values[i].string_value;
+        case VARCHAR: {
+            const char *str = data->column_values[i].varchar;
             uint16_t size = strlen(str);
             tuple_size += (sizeof(uint16_t) + size);
             break;
         }
-        case UINT16:
-            tuple_size += sizeof(uint16_t);
+        case INTEGER:
+            tuple_size += sizeof(int32_t);
             break;
-        case UINT32:
-            tuple_size += sizeof(uint32_t);
+        case DECIMAL:
+            tuple_size += sizeof(double);
             break;
+        case BOOLEAN:
+            tuple_size += sizeof(bool);
         }
     }
 
@@ -189,22 +191,26 @@ void *add_tuple(void *data_args) {
     uint16_t tuple_buf_offset = 0;
     for (uint8_t i = 0; i < data->num_columns; i++) {
         switch (data->column_types[i]) {
-        case STRING: {
-            const char *str = data->column_values[i].string_value;
+        case VARCHAR: {
+            const char *str = data->column_values[i].varchar;
             uint16_t size = strlen(str);
             encode_uint16(size, tuple_buf + tuple_buf_offset);
             memcpy(tuple_buf + tuple_buf_offset + sizeof(uint16_t), str, size);
             tuple_buf_offset += (sizeof(uint16_t) + size);
             break;
         }
-        case UINT16: {
-            encode_uint16(data->column_values[i].uint16_value, tuple_buf + tuple_buf_offset);
-            tuple_buf_offset += sizeof(uint16_t);
+        case INTEGER: {
+            encode_int32(data->column_values[i].integer, tuple_buf + tuple_buf_offset);
+            tuple_buf_offset += sizeof(int);
             break;
         }
-        case UINT32:
-            encode_uint32(data->column_values[i].uint32_value, tuple_buf + tuple_buf_offset);
-            tuple_buf_offset += sizeof(uint32_t);
+        case DECIMAL:
+            encode_double(data->column_values[i].decimal, tuple_buf + tuple_buf_offset);
+            tuple_buf_offset += sizeof(double);
+            break;
+        case BOOLEAN:
+            encode_bool(data->column_values[i].boolean, tuple_buf + tuple_buf_offset);
+            tuple_buf_offset += sizeof(bool);
             break;
         }
     }

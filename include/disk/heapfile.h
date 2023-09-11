@@ -1,3 +1,5 @@
+#pragma once
+
 #include "../utils/hash.h"
 #include "../utils/shared.h"
 #include "disk_manager.h"
@@ -8,6 +10,8 @@
  * page 0 - page directory
  * page 1 - table schema
  */
+#define PAGE_DIR_PAGE 0
+#define TABLE_SCHEMA_PAGE 1
 #define START_USER_PAGE 2
 
 /*
@@ -47,12 +51,13 @@ typedef struct {
 
 enum TupleAction { TUPLE_ADD = 1, TUPLE_REMOVE = 2 };
 
-enum ColumnType { UINT32 = 0x01, UINT16 = 0x02, STRING = 0x03 };
+enum ColumnType { BOOLEAN = 0x01, VARCHAR = 0x02, INTEGER = 0x03, DECIMAL = 0x04 };
 
 typedef union {
-    uint32_t uint32_value;
-    uint16_t uint16_value;
-    const char *string_value;
+    u8 boolean;
+    i32 integer;
+    double decimal;
+    const char *varchar;
 } ColumnValue;
 
 typedef struct {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../disk/heapfile.h"
 #include "../utils/shared.h"
 #include <cstdint>
 #include <memory>
@@ -87,12 +88,7 @@ struct DecimalPrimitiveType : PrimitiveType {
 struct PrimitiveValue {
     PrimitiveTypeRef type;
 
-    union {
-        u8 boolean;
-        i32 integer;
-        double decimal;
-        char *varchar;
-    } value;
+    ColumnValue value;
 
     u16 length; // for str type
 

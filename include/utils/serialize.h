@@ -34,11 +34,7 @@
 //------------------------------------------------------------------------------------------------------
 
 /**
- * encoding/decoding functions for serializing data used to persist it on disk
- *
- * Serialization formats:
- * uint32 - big endian binary format
- * uint16 - big endian binary format
+ * Encoding/decoding functions for serializing different data types used for disk persistence
  */
 
 void encode_uint32(uint32_t data, uint8_t *buf);
@@ -46,3 +42,15 @@ uint32_t decode_uint32(uint8_t *buf);
 
 void encode_uint16(uint16_t data, uint8_t *buf);
 uint16_t decode_uint16(uint8_t *buf);
+
+void encode_int32(int data, uint8_t *buf);
+int32_t decode_int32(uint8_t *buf);
+
+void encode_int16(int data, uint8_t *buf);
+int16_t decode_int16(uint8_t *buf);
+
+void encode_double(double data, uint8_t *buf);
+double decode_double(uint8_t *buf);
+
+void encode_bool(bool data, uint8_t *buf);
+bool decode_bool(uint8_t *buf);

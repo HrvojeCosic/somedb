@@ -1,4 +1,5 @@
 #include "../include/sql/lexer.hpp"
+#include "../include/sql/logical_plan.hpp"
 #include "../include/sql/parser.hpp"
 #include "../include/sql/primitive.hpp"
 #include <array>
@@ -156,4 +157,10 @@ TEST_F(SqlTestFixture, ParseTest) {
     auto out5 = parse("SELECT some_col, other_col FROM foo WHERE some_col <= 10");
     TestSelectStatement(out5, std::vector<std::string>{"some_col", "other_col"}, "foo", "some_col<=10");
 }
+
+TEST_F(SqlTestFixture, LogicalScanTest) {
+    //    HeapfileAccess heapfile_acc();
+    //    LogicalScan scan()
+}
+
 } // namespace somedb

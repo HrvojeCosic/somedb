@@ -17,7 +17,7 @@ void teardown(void) { remove_table(table_name); }
 
 START_TEST(initialize) {
     char col_n[4] = "bpm";
-    Column cols[1] = {{.name_len = 3, .name = col_n, .type = STRING}};
+    Column cols[1] = {{.name_len = 3, .name = col_n, .type = VARCHAR}};
     disk_manager = create_table("bpm_test", cols, 1);
 
     const size_t pool_size = 3;
