@@ -1,5 +1,8 @@
 #include "../../include/sql/primitive.hpp"
+#include "../../include/utils/serialize.h"
+
 #include <cassert>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -31,6 +34,12 @@ PrimitiveValue PrimitiveType::divide(const PrimitiveValue &, const PrimitiveValu
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------
+u32 BooleanPrimitiveType::getSize() const { return BOOLEAN_SIZE; };
+
+PrimitiveValue BooleanPrimitiveType::deserialize(u8 *buf) const {
+    return PrimitiveValue(std::make_shared<BooleanPrimitiveType>(), static_cast<bool>(*buf));
+};
+
 CmpState BooleanPrimitiveType::equals(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
     return l.value.boolean == r.value.boolean ? SQL_TRUE : SQL_FALSE;
@@ -52,6 +61,16 @@ CmpState BooleanPrimitiveType::lessThan(const PrimitiveValue &l, const Primitive
 };
 
 //--------------------------------------------------------------------------------------------------------------------------------
+u32 VarcharPrimitiveType::getSize() const { return STRING_SIZE; };
+
+PrimitiveValue VarcharPrimitiveType::deserialize(u8 *buf) const {
+    char val[STRING_SIZE];
+    std::memcpy(val, buf, STRING_SIZE);
+    std::string col_val(val, STRING_SIZE);
+
+    return PrimitiveValue(std::make_shared<VarcharPrimitiveType>(), col_val.data());
+};
+
 CmpState VarcharPrimitiveType::equals(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
     return l.value.varchar == r.value.varchar ? SQL_TRUE : SQL_FALSE;
@@ -73,6 +92,12 @@ CmpState VarcharPrimitiveType::lessThan(const PrimitiveValue &l, const Primitive
 };
 
 //--------------------------------------------------------------------------------------------------------------------------------
+u32 IntegerPrimitiveType::getSize() const { return INTEGER_SIZE; };
+
+PrimitiveValue IntegerPrimitiveType::deserialize(u8 *buf) const {
+    return PrimitiveValue(std::make_shared<IntegerPrimitiveType>(), decode_int32(buf));
+};
+
 CmpState IntegerPrimitiveType::equals(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
     return l.value.integer == r.value.integer ? SQL_TRUE : SQL_FALSE;
@@ -130,6 +155,12 @@ PrimitiveValue IntegerPrimitiveType::divide(const PrimitiveValue &l, const Primi
 };
 
 //--------------------------------------------------------------------------------------------------------------------------------
+u32 DecimalPrimitiveType::getSize() const { return DECIMAL_SIZE; };
+
+PrimitiveValue DecimalPrimitiveType::deserialize(u8 *buf) const {
+    return PrimitiveValue(std::make_shared<DecimalPrimitiveType>(), decode_double(buf));
+};
+
 CmpState DecimalPrimitiveType::equals(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
     return l.value.decimal == r.value.decimal ? SQL_TRUE : SQL_FALSE;

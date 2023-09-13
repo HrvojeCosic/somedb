@@ -25,6 +25,12 @@ struct PrimitiveType {
     // Asserts that the two types being evaluated against each other are of the same type
     void assertTypesEqual(const PrimitiveValue &l, const PrimitiveValue &r) const;
 
+    // Returns space occupied by a value of a concrete data type
+    virtual u32 getSize() const = 0;
+
+    // Deserializes a value from a raw byte buffer
+    virtual PrimitiveValue deserialize(u8 *buf) const = 0;
+
     // Checks if left and right values are equal
     virtual CmpState equals(const PrimitiveValue &l, const PrimitiveValue &r) const = 0;
 
@@ -47,6 +53,8 @@ struct PrimitiveType {
 };
 
 struct BooleanPrimitiveType : PrimitiveType {
+    u32 getSize() const override;
+    PrimitiveValue deserialize(u8 *buf) const override;
     CmpState equals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState notEquals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState greaterThan(const PrimitiveValue &l, const PrimitiveValue &r) const override;
@@ -54,6 +62,8 @@ struct BooleanPrimitiveType : PrimitiveType {
 };
 
 struct VarcharPrimitiveType : PrimitiveType {
+    u32 getSize() const override;
+    PrimitiveValue deserialize(u8 *buf) const override;
     CmpState equals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState notEquals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState greaterThan(const PrimitiveValue &l, const PrimitiveValue &r) const override;
@@ -61,6 +71,8 @@ struct VarcharPrimitiveType : PrimitiveType {
 };
 
 struct IntegerPrimitiveType : PrimitiveType {
+    u32 getSize() const override;
+    PrimitiveValue deserialize(u8 *buf) const override;
     CmpState equals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState notEquals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState greaterThan(const PrimitiveValue &l, const PrimitiveValue &r) const override;
@@ -73,6 +85,8 @@ struct IntegerPrimitiveType : PrimitiveType {
 };
 
 struct DecimalPrimitiveType : PrimitiveType {
+    u32 getSize() const override;
+    PrimitiveValue deserialize(u8 *buf) const override;
     CmpState equals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState notEquals(const PrimitiveValue &l, const PrimitiveValue &r) const override;
     CmpState greaterThan(const PrimitiveValue &l, const PrimitiveValue &r) const override;
@@ -94,7 +108,7 @@ struct PrimitiveValue {
 
     PrimitiveValue(){};
 
-    PrimitiveValue(PrimitiveTypeRef type, u8 b) : type(std::move(type)) { value = {.boolean = b}; };
+    PrimitiveValue(PrimitiveTypeRef type, bool b) : type(std::move(type)) { value = {.boolean = b}; };
 
     PrimitiveValue(PrimitiveTypeRef type, int32_t i) : type(std::move(type)) { value = {.integer = i}; };
 

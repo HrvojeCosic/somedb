@@ -4,6 +4,8 @@
 #include "./schema.hpp"
 #include "./sql_expression.hpp"
 
+#include <algorithm>
+
 namespace somedb {
 
 struct LogicalExpr;
@@ -15,7 +17,7 @@ using LogicalExprRef = std::shared_ptr<LogicalExpr>;
  * schema
  */
 struct LogicalExpr {
-    LogicalExpr(std::vector<LogicalExprRef> children) : children(std::move(children)){};
+    LogicalExpr(std::vector<LogicalExprRef> c, PrimitiveTypeRef t) : children(std::move(c)), return_type(t){};
 
     virtual ~LogicalExpr() = default;
     virtual PrimitiveValue evaluate(Row &row, Table &table) = 0;
@@ -28,11 +30,21 @@ struct LogicalExpr {
 struct ConstantLogicalExpr : LogicalExpr {
     PrimitiveValue value;
 
-    ConstantLogicalExpr(PrimitiveValue val) : LogicalExpr({}), value(std::move(val)){};
+    ConstantLogicalExpr(PrimitiveValue val) : LogicalExpr({}, val.type), value(std::move(val)){};
 
     PrimitiveValue evaluate(Row &, Table &) override { return value; };
 
     inline std::string toString() const override { return value.toString(); };
+};
+
+struct ColumnLogicalExpr : LogicalExpr {
+    std::string name;
+
+    ColumnLogicalExpr(std::string name, PrimitiveTypeRef ret_type) : LogicalExpr({}, ret_type), name(name){};
+
+    PrimitiveValue evaluate(Row &row, Table &table) override;
+
+    inline std::string toString() const override { return "Column: " + name; };
 };
 
 enum BinaryOpType { ADD, SUBTRACT, DIVIDE, MULTIPLY };
@@ -40,10 +52,10 @@ enum BinaryOpType { ADD, SUBTRACT, DIVIDE, MULTIPLY };
 struct BinaryLogicalExpr : LogicalExpr {
     BinaryOpType op;
 
-    BinaryLogicalExpr(LogicalExprRef left, LogicalExprRef right, BinaryOpType op)
-        : LogicalExpr({std::move(left), std::move(right)}), op(op){};
+    BinaryLogicalExpr(LogicalExprRef l, LogicalExprRef r, BinaryOpType op)
+        : LogicalExpr({std::move(l), std::move(r)}, l->return_type), op(op){};
 
-    PrimitiveValue evaluate(Row &, Table &) override;
+    PrimitiveValue evaluate(Row &row, Table &) override;
     inline std::string toString() const override;
 };
 } // namespace somedb

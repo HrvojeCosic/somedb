@@ -19,7 +19,7 @@ struct AccessMethod {
     virtual ~AccessMethod() = default;
 
     virtual Table schema() const = 0;
-    virtual std::vector<Row> scan() const = 0; 
+    virtual std::vector<Row> scan() const = 0;
 };
 
 struct HeapfileAccess : AccessMethod {

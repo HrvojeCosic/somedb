@@ -24,6 +24,15 @@ typedef int64_t i64;
 
 enum PageType { HEAP_PAGE = 1, BTREE_INDEX_PAGE = 2, INVALID = 0 };
 
+//---------------------------------------------------------------------------------
+enum ColumnType { BOOLEAN = 0x01, VARCHAR = 0x02, INTEGER = 0x03, DECIMAL = 0x04 };
+
+#define BOOLEAN_SIZE 1
+#define STRING_SIZE 1024
+#define INTEGER_SIZE sizeof(i32)
+#define DECIMAL_SIZE 8
+//---------------------------------------------------------------------------------
+
 /*
  * Record id (RID) is a unique identifier for a record with information necessary to
  * find the corresponding page and the offset in that page using the slot number

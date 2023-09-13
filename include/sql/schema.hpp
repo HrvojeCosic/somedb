@@ -19,14 +19,6 @@ struct Column {
     }
 };
 
-// Logical representation of a tuple
-struct Row {
-    std::vector<u8> data;
-
-    // Gets the value under a specified column
-    PrimitiveValue getValue(Column &col);
-};
-
 // Logical representation of a table (schema)
 struct Table {
     std::string name;
@@ -46,5 +38,13 @@ struct Table {
 
         return true;
     }
+};
+
+// Logical representation of a tuple
+struct Row {
+    u8 *data;
+
+    // Gets the value under a specified column
+    PrimitiveValue getValue(Column &col, Table &schema);
 };
 } // namespace somedb

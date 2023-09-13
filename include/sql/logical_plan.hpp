@@ -12,7 +12,7 @@
 namespace somedb {
 
 struct LogicalOperator;
-using LogicalOperatorrRef = std::unique_ptr<LogicalOperator>;
+using LogicalOperatorRef = std::unique_ptr<LogicalOperator>;
 
 struct LogicalOperator {
     virtual ~LogicalOperator() = default;
@@ -20,14 +20,14 @@ struct LogicalOperator {
     // Gets the schema of the logical plan operator
     virtual Table schema() const = 0;
 
-    // Gets the children of the
-    virtual std::vector<LogicalOperatorrRef> children() const = 0;
+    // Gets the children of the logical plan operator
+    virtual std::vector<LogicalOperatorRef> children() = 0;
 
     // Returns the plan of the operator as a formatted string
     virtual std::string toString() const = 0;
 
     // Prints the logical plan from the top (starting from OP) in a readable format (helps in debugging)
-    static void pretty(LogicalOperatorrRef op, int indent);
+    static void pretty(LogicalOperatorRef op, int indent);
 };
 
 struct LogicalScan : LogicalOperator {
@@ -37,22 +37,38 @@ struct LogicalScan : LogicalOperator {
 
     Table schema() const override { return access_method->schema(); };
 
-    std::vector<LogicalOperatorrRef> children() const override { return std::vector<LogicalOperatorrRef>(); };
+    std::vector<LogicalOperatorRef> children() override { return std::vector<LogicalOperatorRef>(); };
 
     std::string toString() const override { return "Scan: " + access_method->schema().name; };
 };
 
 struct LogicalSelection : LogicalOperator {
-    LogicalOperatorrRef input;
-    std::unique_ptr<LogicalExpr> expr;
+    LogicalOperatorRef input;
+    LogicalExprRef expr;
 
-    LogicalSelection(LogicalOperatorrRef input, std::unique_ptr<LogicalExpr> expr)
-        : input(std::move(input)), expr(std::move(expr)){};
+    LogicalSelection(LogicalOperatorRef input, LogicalExprRef expr) : input(std::move(input)), expr(std::move(expr)){};
 
     Table schema() const override { return input->schema(); };
 
-    std::vector<LogicalOperatorrRef> children() const override { return input->children(); };
+    std::vector<LogicalOperatorRef> children() override;
 
     std::string toString() const override { return "Selection: " + expr->toString(); };
+};
+
+// TODO: projection currently only works with column logical expressions,
+// but it should work with other logical expressions. For example, it should be possible
+// to make a query like: SELECT foo * 100 FROM ...
+struct LogicalProjection : LogicalOperator {
+    LogicalOperatorRef input;
+    std::vector<ColumnLogicalExpr> proj_cols;
+
+    LogicalProjection(LogicalOperatorRef input, std::vector<ColumnLogicalExpr> proj_cols)
+        : input(std::move(input)), proj_cols(std::move(proj_cols)){};
+
+    std::vector<LogicalOperatorRef> children() override;
+
+    Table schema() const override;
+
+    std::string toString() const override;
 };
 } // namespace somedb

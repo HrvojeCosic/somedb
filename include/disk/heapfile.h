@@ -51,8 +51,6 @@ typedef struct {
 
 enum TupleAction { TUPLE_ADD = 1, TUPLE_REMOVE = 2 };
 
-enum ColumnType { BOOLEAN = 0x01, VARCHAR = 0x02, INTEGER = 0x03, DECIMAL = 0x04 };
-
 typedef union {
     u8 boolean;
     i32 integer;

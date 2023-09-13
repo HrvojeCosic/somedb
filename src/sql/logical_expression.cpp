@@ -50,4 +50,13 @@ std::string BinaryLogicalExpr::toString() const {
 
     return lhs->toString() + op_str + rhs->toString();
 };
+
+PrimitiveValue ColumnLogicalExpr::evaluate(Row &row, Table &table) {
+    auto same_name = [this](Column col) { return col.name == name; };
+    auto schema_col = std::find_if(table.columns.begin(), table.columns.end(), same_name);
+    if (schema_col == table.columns.end())
+        throw std::runtime_error("Column " + name + " not found in the schema");
+
+    return row.getValue(*schema_col, table);
+};
 } // namespace somedb

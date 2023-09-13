@@ -184,25 +184,33 @@ TEST_F(SqlTestFixture, ParseTest) {
     TestSelectStatement(out5, std::vector<std::string>{"some_col", "other_col"}, "foo", "some_col<=10");
 }
 
-
 // -----------------------------------------------------------------------------------------------------
 // LOGICAL OPERATORS
 // -----------------------------------------------------------------------------------------------------
-TEST_F(SqlTestFixture, LogicalScanTest) {
+TEST_F(SqlTestFixture, LogicalOperatorTest) {
     SetupTable();
     AccessMethodRef heapfile_acc = std::make_unique<HeapfileAccess>("test_table");
+
+    // SCAN
     LogicalScan scan(std::move(heapfile_acc));
+    Table actual_scan_schema = scan.schema();
 
-    Table actual_schema = scan.schema();
-
-    auto type_foo = dynamic_cast<VarcharPrimitiveType &>(*actual_schema.columns[0].data_type);
-    auto type_bar = dynamic_cast<DecimalPrimitiveType &>(*actual_schema.columns[1].data_type);
+    auto type_foo = dynamic_cast<VarcharPrimitiveType &>(*actual_scan_schema.columns[0].data_type);
+    auto type_bar = dynamic_cast<DecimalPrimitiveType &>(*actual_scan_schema.columns[1].data_type);
     Column col_foo("foo", std::make_unique<VarcharPrimitiveType>(type_foo));
     Column col_bar("bar", std::make_unique<DecimalPrimitiveType>(type_bar));
-    
-    Table expected_schema(actual_schema.name, std::vector<Column>{col_foo, col_bar});
 
-    EXPECT_EQ(expected_schema == actual_schema, true); // NOLINT
+    Table expected_schema(actual_scan_schema.name, std::vector<Column>{col_foo, col_bar});
+    EXPECT_EQ(expected_schema == actual_scan_schema, true); // NOLINT
+
+    // PROJECT
+    auto project_cols =
+        std::vector<ColumnLogicalExpr>{ColumnLogicalExpr("foo", std::make_unique<VarcharPrimitiveType>())};
+    LogicalProjection project(std::make_unique<LogicalScan>(std::move(scan)), project_cols);
+    Table actual_project_schema = project.schema();
+
+    Table expected_project_schema(actual_project_schema.name, std::vector<Column>{col_foo});
+    EXPECT_EQ(expected_project_schema == actual_project_schema, true); // NOLINT
 }
 
 } // namespace somedb
