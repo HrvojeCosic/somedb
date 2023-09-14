@@ -18,10 +18,10 @@ class SqlTestFixture : public testing::Test {
     void SetupTable() {
         char x[4] = "foo";
         char y[4] = "bar";
-        ::Column cols[2] = {{.name_len = 3, .name = x, .type = VARCHAR}, {.name_len = 3, .name = y, .type = DECIMAL}};
+        ::Column cols[2] = {{.name_len = 3, .name = x, .type = ColumnType::STRING}, {.name_len = 3, .name = y, .type = DECIMAL}};
         const char *col_names[2] = {"foo", "bar"};
-        ColumnType col_types[2] = {VARCHAR, DECIMAL};
-        ColumnValue col_vals[2] = {{.varchar = "Baz"}, {.decimal = 123.12}};
+        ColumnType col_types[2] = {ColumnType::STRING, DECIMAL};
+        ColumnValue col_vals[2] = {{.string = "Baz"}, {.decimal = 123.12}};
         TuplePtr *t_ptr = (TuplePtr *)malloc(sizeof(TuplePtr));
         DiskManager *disk_mgr = create_table("test_table", cols, 2);
         new_heap_page(disk_mgr);
@@ -86,12 +86,12 @@ TEST_F(SqlTestFixture, PrimitivesTest) {
     EXPECT_EQ(bool_type->greaterThan(*bool_true, *bool_false), CmpState::SQL_TRUE);
     EXPECT_EQ(bool_type->lessThan(*bool_false, *bool_true), CmpState::SQL_TRUE);
 
-    // Varchar tests
-    std::string varchar = "ABCD EFGH IJK foo";
+    // String tests
+    std::string string = "ABCD EFGH IJK foo";
     std::string varchar_other = "LMNOP QRS TUV bar";
     auto varchar_type = std::make_shared<VarcharPrimitiveType>();
-    auto varchar_val1 = std::make_unique<PrimitiveValue>(varchar_type, varchar.data(), varchar.length());
-    auto varchar_val2 = std::make_unique<PrimitiveValue>(varchar_type, varchar.data(), varchar.length());
+    auto varchar_val1 = std::make_unique<PrimitiveValue>(varchar_type, string.data(), string.length());
+    auto varchar_val2 = std::make_unique<PrimitiveValue>(varchar_type, string.data(), string.length());
     auto varchar_val3 = std::make_unique<PrimitiveValue>(varchar_type, varchar_other.data(), varchar_other.length());
 
     EXPECT_EQ(varchar_type->equals(*varchar_val1, *varchar_val2), CmpState::SQL_TRUE);

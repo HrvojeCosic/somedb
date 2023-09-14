@@ -39,7 +39,7 @@ void add_tuple_teardown(void) {
 
 START_TEST(add_table) {
     char col_n[4] = "ads";
-    Column cols[1] = {{.name_len = 3, .name = col_n, .type = VARCHAR}};
+    Column cols[1] = {{.name_len = 3, .name = col_n, .type = STRING}};
     create_table(add_tab1, cols, 0);
     create_table(add_tab2, cols, 0);
     create_table(add_tab3, cols, 0);
@@ -104,7 +104,7 @@ END_TEST
 START_TEST(add_tuple_to_page) {
     char cname1[5] = "name";
     char cname2[5] = "age";
-    Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = VARCHAR},
+    Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = STRING},
                       {.name_len = (uint8_t)strlen(cname2), .name = cname2, .type = INTEGER}};
     const char add_tuple_tab[25] = "add_tuple_to_page_test";
     DiskManager *disk_mgr = create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
@@ -112,8 +112,8 @@ START_TEST(add_tuple_to_page) {
 
     const char *col_names[2] = {"name", "age"};
     const char *col_names2[2] = {"wrong_col", "another_wrong_col"};
-    ColumnType col_types[2] = {VARCHAR, INTEGER};
-    ColumnValue col_vals[2] = {{.varchar = "Pero"}, {.integer = 21}};
+    ColumnType col_types[2] = {STRING, INTEGER};
+    ColumnValue col_vals[2] = {{.string = "Pero"}, {.integer = 21}};
     int name_len = strlen("Pero");
 
     t_ptr1 = (TuplePtr *)malloc(sizeof(TuplePtr));
@@ -179,16 +179,16 @@ START_TEST(remove_tuple_and_defragment) {
     // -----------------------------------------------------------------------------------------------------
     char cname1[5] = "name";
     char cname2[5] = "age";
-    Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = VARCHAR},
+    Column cols[2] = {{.name_len = (uint8_t)strlen(cname1), .name = cname1, .type = STRING},
                       {.name_len = (uint8_t)strlen(cname2), .name = cname2, .type = INTEGER}};
     DiskManager *disk_mgr = create_table(add_tuple_tab, cols, (sizeof(cols) / sizeof(Column)));
     page_id_t pid = new_heap_page(disk_mgr);
 
     const char *col_names[2] = {"name", "age"};
-    ColumnType col_types[2] = {VARCHAR, INTEGER};
-    ColumnValue col_vals1[2] = {{.varchar = "Marica"}, {.integer = 21}};
-    ColumnValue col_vals2[2] = {{.varchar = "Perica"}, {.integer = 31}};
-    ColumnValue col_vals3[2] = {{.varchar = "Nikolina"}, {.integer = 41}};
+    ColumnType col_types[2] = {STRING, INTEGER};
+    ColumnValue col_vals1[2] = {{.string = "Marica"}, {.integer = 21}};
+    ColumnValue col_vals2[2] = {{.string = "Perica"}, {.integer = 31}};
+    ColumnValue col_vals3[2] = {{.string = "Nikolina"}, {.integer = 41}};
     // Perica and Marica are of same length for defragment testing convenience (that while loop)
     uint16_t name_len1 = strlen("Marica");
     uint16_t name_len2 = strlen("Perica");

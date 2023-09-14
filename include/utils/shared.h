@@ -25,7 +25,7 @@ typedef int64_t i64;
 enum PageType { HEAP_PAGE = 1, BTREE_INDEX_PAGE = 2, INVALID = 0 };
 
 //---------------------------------------------------------------------------------
-enum ColumnType { BOOLEAN = 0x01, VARCHAR = 0x02, INTEGER = 0x03, DECIMAL = 0x04 };
+enum ColumnType { BOOLEAN = 0x01, STRING = 0x02, INTEGER = 0x03, DECIMAL = 0x04 };
 
 #define BOOLEAN_SIZE 1
 #define STRING_SIZE 1024

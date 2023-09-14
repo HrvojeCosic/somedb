@@ -73,22 +73,22 @@ PrimitiveValue VarcharPrimitiveType::deserialize(u8 *buf) const {
 
 CmpState VarcharPrimitiveType::equals(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
-    return l.value.varchar == r.value.varchar ? SQL_TRUE : SQL_FALSE;
+    return l.value.string == r.value.string ? SQL_TRUE : SQL_FALSE;
 };
 
 CmpState VarcharPrimitiveType::notEquals(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
-    return l.value.varchar != r.value.varchar ? SQL_TRUE : SQL_FALSE;
+    return l.value.string != r.value.string ? SQL_TRUE : SQL_FALSE;
 };
 
 CmpState VarcharPrimitiveType::greaterThan(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
-    return l.value.varchar > r.value.varchar ? SQL_TRUE : SQL_FALSE;
+    return l.value.string > r.value.string ? SQL_TRUE : SQL_FALSE;
 };
 
 CmpState VarcharPrimitiveType::lessThan(const PrimitiveValue &l, const PrimitiveValue &r) const {
     PrimitiveType::assertTypesEqual(l, r);
-    return l.value.varchar < r.value.varchar ? SQL_TRUE : SQL_FALSE;
+    return l.value.string < r.value.string ? SQL_TRUE : SQL_FALSE;
 };
 
 //--------------------------------------------------------------------------------------------------------------------------------

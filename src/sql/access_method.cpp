@@ -37,7 +37,7 @@ Table HeapfileAccess::schema() const {
         case BOOLEAN:
             col_type = std::make_unique<BooleanPrimitiveType>();
             break;
-        case VARCHAR:
+        case STRING:
             col_type = std::make_unique<VarcharPrimitiveType>();
             break;
         case INTEGER:

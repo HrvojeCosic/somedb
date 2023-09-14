@@ -115,7 +115,7 @@ struct PrimitiveValue {
     PrimitiveValue(PrimitiveTypeRef type, double d) : type(std::move(type)) { value = {.decimal = d}; };
 
     PrimitiveValue(PrimitiveTypeRef type, char *val, u16 vc) : type(std::move(type)) {
-        value = {.varchar = val}, length = vc;
+        value = {.string = val}, length = vc;
     };
 
     inline std::string toString() const { return type->toString(); };

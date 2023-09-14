@@ -32,7 +32,7 @@ class IndexTestFixture : public testing::Test {
         // Table setup
         char cname1[5] = "name";
         char cname2[5] = "age";
-        Column cols[2] = {{.name_len = (u8)strlen(cname1), .name = cname1, .type = VARCHAR},
+        Column cols[2] = {{.name_len = (u8)strlen(cname1), .name = cname1, .type = STRING},
                           {.name_len = (u8)strlen(cname2), .name = cname2, .type = INTEGER}};
         create_table(table_name.data(), cols, (sizeof(cols) / sizeof(Column)));
 

@@ -55,7 +55,7 @@ typedef union {
     u8 boolean;
     i32 integer;
     double decimal;
-    const char *varchar;
+    const char *string;
 } ColumnValue;
 
 typedef struct {

@@ -170,8 +170,8 @@ void *add_tuple(void *data_args) {
     uint16_t tuple_size = 0;
     for (uint8_t i = 0; i < data->num_columns; i++) {
         switch (data->column_types[i]) {
-        case VARCHAR: {
-            const char *str = data->column_values[i].varchar;
+        case STRING: {
+            const char *str = data->column_values[i].string;
             uint16_t size = strlen(str);
             tuple_size += (sizeof(uint16_t) + size);
             break;
@@ -192,8 +192,8 @@ void *add_tuple(void *data_args) {
     uint16_t tuple_buf_offset = 0;
     for (uint8_t i = 0; i < data->num_columns; i++) {
         switch (data->column_types[i]) {
-        case VARCHAR: {
-            const char *str = data->column_values[i].varchar;
+        case STRING: {
+            const char *str = data->column_values[i].string;
             uint16_t size = strlen(str);
             encode_uint16(size, tuple_buf + tuple_buf_offset);
             memcpy(tuple_buf + tuple_buf_offset + sizeof(uint16_t), str, size);
