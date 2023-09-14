@@ -211,6 +211,15 @@ TEST_F(SqlTestFixture, LogicalOperatorTest) {
 
     Table expected_project_schema(actual_project_schema.name, std::vector<Column>{col_foo});
     EXPECT_EQ(expected_project_schema == actual_project_schema, true); // NOLINT
+
+    // AGGREGATE
+    auto aggr_col = ColumnLogicalExpr("foo", std::make_unique<VarcharPrimitiveType>());
+    auto group_col = ColumnLogicalExpr("foo", std::make_unique<VarcharPrimitiveType>());
+    LogicalAggregation aggr(std::make_unique<LogicalProjection>(std::move(project)), aggr_col, group_col, SUM);
+    Table actual_aggr_schema = aggr.schema();
+
+    Table expected_aggr_schema(actual_aggr_schema.name, std::vector<Column>{col_foo, col_foo});
+    EXPECT_EQ(expected_aggr_schema == actual_aggr_schema, true); // NOLINT
 }
 
 } // namespace somedb

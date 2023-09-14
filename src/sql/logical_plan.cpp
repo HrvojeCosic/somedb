@@ -17,13 +17,7 @@ void LogicalOperator::pretty(LogicalOperatorRef op, int indent) {
     }
 };
 
-std::vector<LogicalOperatorRef> LogicalSelection::children() {
-    auto ch = std::vector<LogicalOperatorRef>();
-    ch.emplace_back(std::move(input));
-    return ch;
-};
-
-std::vector<LogicalOperatorRef> LogicalProjection::children() {
+std::vector<LogicalOperatorRef> LogicalOperator::children() {
     auto ch = std::vector<LogicalOperatorRef>();
     ch.emplace_back(std::move(input));
     return ch;
@@ -44,5 +38,4 @@ std::string LogicalProjection::toString() const {
 
     return res;
 };
-
 } // namespace somedb
