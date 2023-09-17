@@ -134,7 +134,7 @@ page_id_t new_heap_page(DiskManager *disk_manager) {
     Header header = {.id = pid, .free_start = PAGE_HEADER_SIZE, .free_end = PAGE_SIZE - 1, .flags = 0x00};
     construct_page_header_buf(page, header);
 
-    write_page(pid, disk_manager, page);
+    write_page(new_ptkey(disk_manager->table_name, pid), page);
     free(page);
     RWLOCK_UNLOCK(&disk_manager->latch);
     return pid;
@@ -224,11 +224,11 @@ void *add_tuple(void *data_args) {
         RWLOCK_UNLOCK(&data->disk_manager->latch);
         return NULL;
     }
-    uint8_t *page = read_page(*pid, data->disk_manager);
+    uint8_t *page = read_page(new_ptkey(data->disk_manager->table_name, *pid));
     Header header = extract_header(page, *pid);
 
     // Extract schema info
-    uint8_t *schema = read_page(1, data->disk_manager);
+    uint8_t *schema = read_page(new_ptkey(data->disk_manager->table_name, 1));
     uint8_t cols_num = *schema + 0;
     schema = schema + START_COLUMNS_INFO;
 
@@ -282,7 +282,7 @@ void *add_tuple(void *data_args) {
     header.free_end -= tuple_size;
     construct_page_header_buf(page, header);
 
-    write_page(*pid, data->disk_manager, page);
+    write_page(new_ptkey(data->disk_manager->table_name, *pid), page);
     update_page_dir(data->disk_manager, *pid, tuple_size, TUPLE_ADD);
 
     data->tup_ptr_out->size = tuple_ptr.size;
@@ -295,7 +295,7 @@ void *add_tuple(void *data_args) {
 
 void remove_tuple(DiskManager *disk_manager, RID rid) {
     RWLOCK_WRLOCK(&disk_manager->latch);
-    uint8_t *page = read_page(rid.pid, disk_manager);
+    uint8_t *page = read_page(new_ptkey(disk_manager->table_name, rid.pid));
 
     TuplePtr tuple_ptr = extract_tuple_ptr(page, rid.slot_num);
 
@@ -306,13 +306,13 @@ void remove_tuple(DiskManager *disk_manager, RID rid) {
 
     construct_page_tuple_ptr(page, rid.slot_num, tuple_ptr);
     construct_page_header_buf(page, header);
-    write_page(rid.pid, disk_manager, page);
+    write_page(new_ptkey(disk_manager->table_name, rid.pid), page);
 
     RWLOCK_UNLOCK(&disk_manager->latch);
 }
 
 uint8_t *get_tuple(RID rid, DiskManager *disk_manager) {
-    uint8_t *page = read_page(rid.pid, disk_manager);
+    uint8_t *page = read_page(new_ptkey(disk_manager->table_name, rid.pid));
     TuplePtr tuple_ptr = extract_tuple_ptr(page, rid.slot_num);
 
     if (tuple_ptr.start_offset == 0) {
@@ -323,14 +323,14 @@ uint8_t *get_tuple(RID rid, DiskManager *disk_manager) {
 }
 
 void defragment(page_id_t page_id, DiskManager *disk_manager) {
-    Header old_header = extract_header(read_page(page_id, disk_manager), page_id);
+    Header old_header = extract_header(read_page(new_ptkey(disk_manager->table_name, page_id)), page_id);
     if ((old_header.flags & COMPACTABLE) == 0)
         return;
 
     uint8_t *page = (uint8_t *)malloc(PAGE_SIZE);
     Header header = {.id = page_id, .free_start = PAGE_HEADER_SIZE, .free_end = PAGE_SIZE - 1, .flags = 0x00};
 
-    uint8_t *temp = read_page(page_id, disk_manager);
+    uint8_t *temp = read_page(new_ptkey(disk_manager->table_name, page_id));
     uint16_t temp_tuple_offset = old_header.free_end;
     uint16_t temp_tup_ptr_offset = PAGE_HEADER_SIZE;
     for (;;) {
@@ -358,5 +358,5 @@ void defragment(page_id_t page_id, DiskManager *disk_manager) {
 
     header.flags = old_header.flags & ~COMPACTABLE;
     construct_page_header_buf(page, header);
-    write_page(page_id, disk_manager, page);
+    write_page(new_ptkey(disk_manager->table_name, page_id), page);
 }

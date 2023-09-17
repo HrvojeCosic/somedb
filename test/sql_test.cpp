@@ -18,7 +18,8 @@ class SqlTestFixture : public testing::Test {
     void SetupTable() {
         char x[4] = "foo";
         char y[4] = "bar";
-        ::Column cols[2] = {{.name_len = 3, .name = x, .type = ColumnType::STRING}, {.name_len = 3, .name = y, .type = DECIMAL}};
+        ::Column cols[2] = {{.name_len = 3, .name = x, .type = ColumnType::STRING},
+                            {.name_len = 3, .name = y, .type = DECIMAL}};
         const char *col_names[2] = {"foo", "bar"};
         ColumnType col_types[2] = {ColumnType::STRING, DECIMAL};
         ColumnValue col_vals[2] = {{.string = "Baz"}, {.decimal = 123.12}};

@@ -13,7 +13,6 @@ class IndexTestFixture : public testing::Test {
   protected:
     std::string table_name = "bplus_test_table";
     std::string index_name = "bplus_test_table_idx";
-    BufferPoolManager *bpm;
     DiskManager *disk_mgr;
 
     const u16 tree_max_size = 4;
@@ -39,7 +38,6 @@ class IndexTestFixture : public testing::Test {
         // Index setup (file, cache etc.)
         disk_mgr = create_btree_index(index_name.data(), tree_max_size);
         disk_mgr->page_type = BTREE_INDEX_PAGE;
-        bpm = new_bpm(100, disk_mgr);
 
         // Data setup
         keys_length = sizeof(keys_data) / sizeof(keys_data[0]);
@@ -87,12 +85,14 @@ class IndexTestFixture : public testing::Test {
     }
 
     // Fetches the btree page/node of provided pid from the buffer pool and forms a BTreePage object out of it
-    BTreePage GetNode(page_id_t pid, BTree tree) { return BTreePage(fetch_bpm_page(pid, tree.bpm)->data); };
+    BTreePage GetNode(page_id_t pid, BTree tree) {
+        return BTreePage(fetch_bpm_page(new_ptkey(tree.disk_mgr->table_name, pid))->data);
+    };
 };
 
 TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeTree) {
     // check the tree metadata page (created with create_btree_index in the setup)
-    BTree tree(bpm);
+    BTree tree(disk_mgr);
     tree.deserialize();
     EXPECT_EQ(tree.magic_num, BTREE_INDEX);
     EXPECT_EQ(tree.node_count, 0);
@@ -116,14 +116,14 @@ TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeNode) {
     u8 num_pairs = page.keys.size();
 
     // write to disk
-    auto bpm_page = allocate_new_page(bpm, BTREE_INDEX_PAGE);
+    auto bpm_page = allocate_new_page(disk_mgr, BTREE_INDEX_PAGE);
     frame_id_t *frame_id =
-        static_cast<frame_id_t *>(hash_find(std::to_string(bpm_page->id).data(), bpm->page_table)->data);
-    write_to_frame(*frame_id, page.serialize(), bpm);
-    flush_page(bpm_page->id, bpm);
+        static_cast<frame_id_t *>(hash_find(std::to_string(bpm_page->id).data(), bpm()->page_table)->data);
+    write_to_frame(*frame_id, page.serialize());
+    flush_page(new_ptkey(disk_mgr->table_name, bpm_page->id));
 
     // check if its correctly written to disk
-    u8 *serialized = read_page(bpm_page->id, disk_mgr);
+    u8 *serialized = read_page(new_ptkey(disk_mgr->table_name, bpm_page->id));
     EXPECT_EQ(decode_uint16(serialized + AVAILABLE_SPACE_START_OFFSET),
               INDEX_PAGE_HEADER_SIZE + (TREE_KV_PTR_SIZE * num_pairs));
     EXPECT_EQ(decode_uint16(serialized + AVAILABLE_SPACE_END_SIZE), PAGE_SIZE - (24 + 3 + 12));
@@ -150,9 +150,9 @@ TEST_F(IndexTestFixture, CreateIndex_SerializeAndDeserializeNode) {
 
 TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
     // check the tree metadata page (created with create_btree_index)
-    u8 *metadata = read_page(BTREE_METADATA_PAGE_ID, bpm->disk_manager);
+    u8 *metadata = read_page(new_ptkey(disk_mgr->table_name, BTREE_METADATA_PAGE_ID));
     EXPECT_EQ(decode_uint32(metadata + MAGIC_NUMBER_OFFSET), BTREE_INDEX);
-    BTree tree(bpm);
+    BTree tree(disk_mgr);
     tree.deserialize();
 
     // insert kv pair
@@ -161,7 +161,7 @@ TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
     RID val1 = {.pid = 4, .slot_num = 5}; // doesn't need to be actual rid
     page_id_t leaf_pid = tree.insert(key1, val1);
 
-    auto bpm_page = fetch_bpm_page(leaf_pid, tree.bpm);
+    auto bpm_page = fetch_bpm_page(new_ptkey(disk_mgr->table_name, leaf_pid));
     BTreePage leaf(bpm_page->data);
 
     EXPECT_EQ(leaf.is_leaf, true);
@@ -172,7 +172,7 @@ TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
     std::string data2 = "0";
     BTreeKey key2 = {reinterpret_cast<u8 *>(data2.data()), static_cast<u8>(data2.length())};
     leaf_pid = tree.insert(key2, val1);
-    bpm_page = fetch_bpm_page(leaf_pid, tree.bpm);
+    bpm_page = fetch_bpm_page(new_ptkey(disk_mgr->table_name, leaf_pid));
     leaf = BTreePage(bpm_page->data);
     EXPECT_EQ((char *)leaf.keys.at(0).data == data2, true);
     EXPECT_EQ((char *)leaf.keys.at(1).data == data1, true);
@@ -181,7 +181,7 @@ TEST_F(IndexTestFixture, InsertTest_RootWithEnoughSpace) {
 }
 
 TEST_F(IndexTestFixture, InsertTest_Splits) {
-    BTree tree(bpm);
+    BTree tree(disk_mgr);
     tree.deserialize();
 
     // Test simple insert
@@ -238,7 +238,7 @@ TEST_F(IndexTestFixture, InsertTest_Splits) {
 }
 
 TEST_F(IndexTestFixture, RemoveTest_NoMerges) {
-    BTree tree(bpm);
+    BTree tree(disk_mgr);
     tree.deserialize();
 
     // Insert two elements
@@ -251,7 +251,7 @@ TEST_F(IndexTestFixture, RemoveTest_NoMerges) {
 }
 
 TEST_F(IndexTestFixture, RemoveTest_Merges) {
-    BTree tree(bpm);
+    BTree tree(disk_mgr);
     tree.deserialize();
 
     // Insert elements until there are 3 levels (1 root, 1 internal, 1 leaf level)
@@ -265,7 +265,7 @@ TEST_F(IndexTestFixture, RemoveTest_Merges) {
     // node left. Now we should have a tree of 1 less level
     tree.remove(keys[12]);
     BTreePage curr_root = GetNode(tree.root_pid, tree);
-    BTreePage root_rightmost(fetch_bpm_page(curr_root.rightmost_ptr, tree.bpm)->data);
+    BTreePage root_rightmost(fetch_bpm_page(new_ptkey(disk_mgr->table_name, curr_root.rightmost_ptr))->data);
     TestEqualNode<RID>(GetNode(INTERNAL_CHILDREN(curr_root.values).at(0), tree), {"A", "B"});
     TestEqualNode<RID>(GetNode(INTERNAL_CHILDREN(curr_root.values).at(1), tree), {"C", "D"});
     TestEqualNode<RID>(GetNode(INTERNAL_CHILDREN(curr_root.values).at(2), tree), {"E", "F"});

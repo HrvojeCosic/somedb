@@ -92,7 +92,7 @@ START_TEST(add_page) {
     ck_assert_int_eq(pid2, START_USER_PAGE);
     ck_assert_int_eq(pid3, START_USER_PAGE);
 
-    uint8_t *page = read_page(pid1, disk_mgr);
+    uint8_t *page = read_page(new_ptkey(disk_mgr->table_name, pid1));
     // check correct header format
     ck_assert_uint_eq(decode_uint16(page), PAGE_HEADER_SIZE);
     ck_assert_uint_eq(decode_uint16(page + sizeof(uint16_t)), PAGE_SIZE - 1);
@@ -137,7 +137,7 @@ START_TEST(add_tuple_to_page) {
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
-    uint8_t *page = read_page(pid, disk_mgr);
+    uint8_t *page = read_page(new_ptkey(disk_mgr->table_name, pid));
     Header header = extract_header(page, pid);
 
     // assert new tuple correctness
@@ -220,7 +220,7 @@ START_TEST(remove_tuple_and_defragment) {
     // but in the future there should probably be some function that gives this information instead
     RID rid3 = {.pid = pid, .slot_num = 2};
 
-    uint8_t *page_before = read_page(pid, disk_mgr);
+    uint8_t *page_before = read_page(new_ptkey(disk_mgr->table_name, pid));
     Header header_before = extract_header(page_before, pid);
     uint8_t read_buf[t_ptr1->size + t_ptr2->size]; // a bit of extra space
     memcpy(read_buf, (page_before + header_before.free_start - TUPLE_PTR_SIZE),
@@ -233,7 +233,7 @@ START_TEST(remove_tuple_and_defragment) {
 
     remove_tuple(disk_mgr, rid3);
 
-    uint8_t *page_after_remove = read_page(pid, disk_mgr);
+    uint8_t *page_after_remove = read_page(new_ptkey(disk_mgr->table_name, pid));
     Header header_after_remove = extract_header(page_after_remove, pid);
     memcpy(read_buf, (page_after_remove + header_after_remove.free_start - TUPLE_PTR_SIZE),
            TUPLE_PTR_SIZE);                        // last added tuple's "start offset"
@@ -247,7 +247,7 @@ START_TEST(remove_tuple_and_defragment) {
     // DEFRAGMENT
     // -----------------------------------------------------------------------------------------------------
     defragment(pid, disk_mgr);
-    uint8_t *page_after_defrag = read_page(pid, disk_mgr);
+    uint8_t *page_after_defrag = read_page(new_ptkey(disk_mgr->table_name, pid));
     Header header_after_defrag = extract_header(page_after_defrag, pid);
 
     uint16_t curr_offset = PAGE_HEADER_SIZE;

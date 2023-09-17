@@ -19,23 +19,30 @@ typedef struct {
 typedef struct {
     size_t pool_size;       // number of frames in the buffer pool
     BpmPage *pages;         // array of pages in the buffer pool
-    HashTable *page_table;  // map pages in the buffer pool to its frames
+    HashTable *page_table;  // map RIDs (stringified) in the buffer pool to its frames
     bool *free_list;        // array of frame statuses (true=free/false=taken)
     ClockReplacer replacer; // finding unpinned frames to replace
-    DiskManager *disk_manager;
+    bool initialized;       // has a BufferPoolManager instance been initialized?
 } BufferPoolManager;
 
 /*
- * Initiates a new buffer pool manager for a specified disk manager and returns a pointer to it
+ * Initiates a new buffer pool manager and returns a pointer to it,
+ * or returns a pointer to an already existing instance
  */
-BufferPoolManager *new_bpm(size_t pool_size, DiskManager *disk_manager);
+static BufferPoolManager bpm_ = {.pool_size = 0,
+                                 .pages = NULL,
+                                 .page_table = NULL,
+                                 .free_list = NULL,
+                                 .replacer = *clock_replacer_init(0),
+                                 .initialized = false};
+BufferPoolManager *bpm(size_t pool_size = 3);
 
 /**
- * Unpins page of provided id from the buffer pool and returns true. If the
+ * Unpins provided page from the buffer pool and returns true. If the
  * page does not exist or it's pin count is already 0, returns false. Sets
  * page's dirty bit to value provided in is_dirty
  */
-bool unpin_page(page_id_t id, bool is_dirty, BufferPoolManager *bpm);
+bool unpin_page(PTKey ptkey, bool is_dirty);
 
 /**
  * Flush provided page to disk, regardless of its dirty bit
@@ -43,23 +50,23 @@ bool unpin_page(page_id_t id, bool is_dirty, BufferPoolManager *bpm);
  * Returns false if the page could not be found in the page table, true
  * otherwise
  */
-bool flush_page(page_id_t id, BufferPoolManager *bpm);
+bool flush_page(PTKey ptkey);
 
 /*
  * Allocates a new page of suitable TYPE on disk, places it in buffer pool BPM and returns a pointer to it.
  * Writes a possible replacement frame back to disk if it contains a dirty page.
  */
-BpmPage *allocate_new_page(BufferPoolManager *bpm, PageType type);
+BpmPage *allocate_new_page(DiskManager *disk_manager, PageType type);
 
 /*
  * Returns the requested page from the buffer pool, or returns a null pointer if
  * page needs to be fetched from disk but no frames are available or evictable.
  * Writes a possible replacement frame back to disk if it contains a dirty page
  */
-BpmPage *fetch_bpm_page(page_id_t page_id, BufferPoolManager *bpm);
+BpmPage *fetch_bpm_page(PTKey pt);
 
 /*
  * Writes provided data to a page contained in the provided frame id and marks it as dirty.
  * This function does NOT write anything to disk
  */
-void write_to_frame(frame_id_t fid, u8 *data, BufferPoolManager *bpm);
+void write_to_frame(frame_id_t fid, u8 *data);

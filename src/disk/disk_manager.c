@@ -1,4 +1,5 @@
 #include "../../include/disk/disk_manager.h"
+#include "../../include/disk/bpm.h"
 #include "../../include/utils/serialize.h"
 #include "../../include/utils/shared.h"
 #include <assert.h>
@@ -24,12 +25,12 @@ int table_file(const char *table_name) {
     return fd;
 }
 
-void write_page(page_id_t page_id, DiskManager *disk_manager, void *data) {
+void write_page(PTKey pt, void *data) {
     char pid_str[11];
-    sprintf(pid_str, "%d", page_id);
+    sprintf(pid_str, "%d", pt.pid);
 
-    int fd = table_file(disk_manager->table_name);
-    int l = lseek(fd, page_id * PAGE_SIZE, SEEK_SET);
+    int fd = table_file(pt.table_name);
+    int l = lseek(fd, pt.pid * PAGE_SIZE, SEEK_SET);
     int w = write(fd, data, PAGE_SIZE);
     int f = fsync(fd);
 
@@ -39,12 +40,12 @@ void write_page(page_id_t page_id, DiskManager *disk_manager, void *data) {
     }
 }
 
-uint8_t *read_page(page_id_t page_id, DiskManager *disk_manager) {
+uint8_t *read_page(PTKey pt) {
     uint8_t *page = (uint8_t *)malloc(PAGE_SIZE);
 
-    int fd = table_file(disk_manager->table_name);
+    int fd = table_file(pt.table_name);
 
-    int offset = page_id * PAGE_SIZE;
+    int offset = pt.pid * PAGE_SIZE;
     off_t fsize = lseek(fd, 0, SEEK_END);
     if (offset >= fsize) {
         fprintf(stderr, "I/O error, reading past EOF\n");
@@ -74,22 +75,44 @@ void remove_table(const char *table_name) {
     remove(path);
 }
 
+// Warning we're just using the fixed PT_KEY_TABLENAME_LEN for the table_name length
+// which could lead to buffer overflows, but we'll just make sure it's never above that
+PTKey new_ptkey(char *table_name, page_id_t pid) {
+    PTKey key{};
+    key.pid = pid;
+    key.table_name = (char *)malloc(PT_KEY_TABLENAME_LEN);
+    memcpy(key.table_name, table_name, PT_KEY_TABLENAME_LEN);
+    return key;
+};
+
+char *ptkey_to_str(PTKey ptkey) {
+    char *str = (char *)malloc(PT_KEY_TABLENAME_LEN + sizeof(page_id_t));
+    sprintf(str, "%s__%d", ptkey.table_name, ptkey.pid);
+    return str;
+};
+
+PTKey ptkey_from_str(char *ptkey_str) {
+    PTKey ptkey = PTKey{};
+    sscanf(ptkey_str, "%s__%d", ptkey.table_name, &ptkey.pid);
+    return ptkey;
+};
+
 // B+tree disk handling methods used by buffer pool, which is in C
 // (so I don't have to deal with linking complications that would arise in test files from declaring these in index.cpp)
 // probably solve this properly if there are more issues like this in the future, but this will do for now
 //-------------------------------------------------------------------------------------------------
 page_id_t new_btree_index_page(DiskManager *disk_manager, bool is_leaf) {
-    u8 *metadata_page = read_page(0, disk_manager);
+    u8 *metadata_page = read_page(new_ptkey(disk_manager->table_name, 0));
     assert(decode_uint32(metadata_page) == BTREE_INDEX);
 
     u16 curr_node_num = decode_uint16(metadata_page + NODE_COUNT_OFFSET);
     u16 new_node_num = curr_node_num + 1;
     encode_uint16(new_node_num, metadata_page + NODE_COUNT_OFFSET);
-    write_page(0, disk_manager, metadata_page);
+    write_page(new_ptkey(disk_manager->table_name, 0), metadata_page);
 
     u8 *page = (u8 *)calloc(PAGE_SIZE, 1);
     memcpy(page + IS_LEAF_OFFSET, &is_leaf, IS_LEAF_SIZE);
-    write_page(new_node_num, disk_manager, page);
+    write_page(new_ptkey(disk_manager->table_name, new_node_num), page);
 
     return new_node_num;
 }

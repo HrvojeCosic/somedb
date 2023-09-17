@@ -18,7 +18,7 @@ void MergeLeafNodeStrategy::merge(BTreePageLocalInfo &local, BTree &tree, std::p
     if (is_left_sib) {
         local.sibling->keys.insert(local.sibling->keys.end(), local.node->keys.begin(), local.node->keys.end());
         sibling_vals.insert(sibling_vals.end(), node_vals.begin(), node_vals.end());
-        BTree::flush_node(local.sibling_pid, local.sibling->serialize(), tree.bpm);
+        BTree::flush_node(new_ptkey(tree.disk_mgr->table_name, local.sibling_pid), local.sibling->serialize());
 
         if (local.parent->keys.size() == 1) {
             INTERNAL_CHILDREN(local.parent->values).at(0) = local.sibling_pid;
@@ -39,7 +39,7 @@ void MergeLeafNodeStrategy::merge(BTreePageLocalInfo &local, BTree &tree, std::p
             parent_vals.at(parent_crumb.second) = local.node_pid;
             local.parent->keys.erase(local.parent->keys.begin() + parent_crumb.second);
         }
-        BTree::flush_node(local.node_pid, local.node->serialize(), tree.bpm);
+        BTree::flush_node(new_ptkey(tree.disk_mgr->table_name, local.node_pid), local.node->serialize());
     }
 };
 
@@ -64,7 +64,7 @@ void MergeNonLeafNodeStrategy::merge(BTreePageLocalInfo &local, BTree &tree, BRE
         sibling_vals.emplace_back(local.sibling->rightmost_ptr);
         sibling_vals.insert(sibling_vals.end(), node_vals.begin(), node_vals.end());
         local.sibling->rightmost_ptr = local.node->rightmost_ptr;
-        BTree::flush_node(local.sibling_pid, local.sibling->serialize(), tree.bpm);
+        BTree::flush_node(new_ptkey(tree.disk_mgr->table_name, local.sibling_pid), local.sibling->serialize());
     } else {
         auto demoted_key = local.parent->keys.at(parent_crumb.second);
         local.parent->keys.erase(local.parent->keys.begin() + parent_crumb.second);
@@ -74,9 +74,9 @@ void MergeNonLeafNodeStrategy::merge(BTreePageLocalInfo &local, BTree &tree, BRE
 
         node_vals.insert(node_vals.end(), sibling_vals.begin(), sibling_vals.end());
         local.node->rightmost_ptr = local.sibling->rightmost_ptr;
-        BTree::flush_node(local.node_pid, local.node->serialize(), tree.bpm);
+        BTree::flush_node(new_ptkey(tree.disk_mgr->table_name, local.node_pid), local.node->serialize());
     }
 
-    BTree::flush_node(parent_crumb.first, local.parent->serialize(), tree.bpm);
+    BTree::flush_node(new_ptkey(tree.disk_mgr->table_name, parent_crumb.first), local.parent->serialize());
 }
 } // namespace somedb

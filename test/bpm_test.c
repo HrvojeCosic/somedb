@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static BufferPoolManager *bpm;
 static page_id_t pid;
 static DiskManager *disk_manager;
 static const char table_name[15] = "bpm_test";
@@ -20,19 +19,15 @@ START_TEST(initialize) {
     Column cols[1] = {{.name_len = 3, .name = col_n, .type = STRING}};
     disk_manager = create_table("bpm_test", cols, 1);
 
-    const size_t pool_size = 3;
-
-    bpm = new_bpm(pool_size, disk_manager);
-    ck_assert_int_eq(bpm->pool_size, pool_size);
-    for (size_t i = 0; i < bpm->pool_size; i++) {
-        ck_assert_int_eq(bpm->free_list[i], true);
+    for (size_t i = 0; i < bpm()->pool_size; i++) {
+        ck_assert_int_eq(bpm()->free_list[i], true);
     }
 }
 
 END_TEST
 
 START_TEST(pin) {
-    BpmPage *bpm_page = allocate_new_page(bpm, HEAP_PAGE);
+    BpmPage *bpm_page = allocate_new_page(disk_manager, HEAP_PAGE);
     pid = bpm_page->id;
 
     ck_assert_int_eq(bpm_page->is_dirty, false);
@@ -45,37 +40,34 @@ START_TEST(pin) {
 END_TEST
 
 START_TEST(unpin) {
-    bool ok1 = unpin_page(pid, false, bpm);
+    PTKey pid_ptkey = new_ptkey(disk_manager->table_name, pid);
+    bool ok1 = unpin_page(pid_ptkey, false);
     ck_assert_int_eq(ok1, true);
 
-    unpin_page(pid, false, bpm);
-    bool ok2 = unpin_page(pid, false, bpm); // once for newpage once for fetchpage
+    unpin_page(pid_ptkey, false);
+    bool ok2 = unpin_page(pid_ptkey, false); // once for newpage once for fetchpage
     ck_assert_int_eq(ok2, false);
 
-    char pid_str[11];
-    sprintf(pid_str, "%d", pid);
-    HashEl *el = hash_find(pid_str, bpm->page_table);
+    HashEl *el = hash_find(ptkey_to_str(pid_ptkey), bpm()->page_table);
     ck_assert_int_eq(*(bool *)el->data, false); // dirty bit unset
 }
 
 END_TEST
 
 START_TEST(flush_page_test) {
-    char pid_str[11];
-    sprintf(pid_str, "%d", pid);
-    HashEl *entry_before_flush = hash_find(pid_str, bpm->page_table);
+    PTKey pt = new_ptkey(disk_manager->table_name, pid);
+    HashEl *entry_before_flush = hash_find(ptkey_to_str(pt), bpm()->page_table);
     frame_id_t fid = *(frame_id_t *)entry_before_flush->data;
-    sprintf(pid_str, "%d", fid);
-    ck_assert_int_eq(bpm->free_list[fid], false);
+    ck_assert_int_eq(bpm()->free_list[fid], false);
 
-    bool ok1 = flush_page(pid, bpm);
+    bool ok1 = flush_page(new_ptkey(disk_manager->table_name, pid));
     ck_assert_int_eq(ok1, true);
 
-    HashEl *entry_after_flush = hash_find(pid_str, bpm->page_table);
+    HashEl *entry_after_flush = hash_find(ptkey_to_str(pt), bpm()->page_table);
     ck_assert_ptr_null(entry_after_flush);
-    ck_assert_int_eq(bpm->free_list[fid], true);
+    ck_assert_int_eq(bpm()->free_list[fid], true);
 
-    bool ok2 = flush_page(pid, bpm);
+    bool ok2 = flush_page(new_ptkey(disk_manager->table_name, pid));
     ck_assert_int_eq(ok2, false);
 }
 

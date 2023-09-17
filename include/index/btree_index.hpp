@@ -31,12 +31,12 @@ using internal_pointers = std::vector<u32>;
 struct BTree {
     u32 magic_num;
     u8 max_size;
-    BufferPoolManager *bpm;
+    DiskManager *disk_mgr;
     page_id_t root_pid;
     u16 node_count;
 
     //--------------------------------------------------------------------------------------------------------------------------------
-    BTree(BufferPoolManager *bpm) : bpm(bpm) { assert(bpm->disk_manager != nullptr); }
+    BTree(DiskManager *disk_mgr) : disk_mgr(disk_mgr) { assert(disk_mgr != nullptr); }
 
     u8 *serialize() const;
 
@@ -51,12 +51,12 @@ struct BTree {
     page_id_t insert(const BTreeKey &key, const RID &val);
 
     // Updates provided node's contents(data) in the buffer pool and flushes it to disk
-    inline static void flush_node(page_id_t node_pid, u8 *data, BufferPoolManager *bpm) {
-        auto bpm_page = fetch_bpm_page(node_pid, bpm);
+    inline static void flush_node(PTKey pt, u8 *data) {
+        auto bpm_page = fetch_bpm_page(pt);
         frame_id_t *fid =
-            static_cast<frame_id_t *>(hash_find(std::to_string(bpm_page->id).data(), bpm->page_table)->data);
-        write_to_frame(*fid, data, bpm);
-        flush_page(node_pid, bpm);
+            static_cast<frame_id_t *>(hash_find(std::to_string(bpm_page->id).data(), bpm()->page_table)->data);
+        write_to_frame(*fid, data);
+        flush_page(pt);
     }
 
     //--------------------------------------------------------------------------------------------------------------------------------
@@ -105,8 +105,8 @@ struct BTree {
     }
 
     // Given its page id, creates and returns a smart pointer of a btree page (the in memory representation)
-    std::unique_ptr<BTreePage> inline getBtreePage(page_id_t pid) {
-        return std::make_unique<BTreePage>(fetch_bpm_page(pid, bpm)->data);
+    std::unique_ptr<BTreePage> inline getBtreePage(PTKey pt) {
+        return std::make_unique<BTreePage>(fetch_bpm_page(pt)->data);
     }
 
     // Returns a page id of the page at the top of the provided stack, or 0 if stack is empty.
@@ -117,7 +117,7 @@ struct BTree {
 
         auto top = breadcrumbs.top();
         breadcrumbs.pop();
-        return fetch_bpm_page(top.first, bpm)->id;
+        return fetch_bpm_page(new_ptkey(disk_mgr->table_name, top.first))->id;
     }
 
     // Returns a vector of node's values, type of which depends on the node type (leaf/internal)

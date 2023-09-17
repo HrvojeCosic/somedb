@@ -12,7 +12,7 @@ Table HeapfileAccess::schema() const {
     // Not an actual disk manager instance, just an adapter around the table name since read_page() accepts DiskManager
     DiskManager mgr{};
     mgr.table_name = const_cast<char *>(path.data());
-    u8 *page_data = read_page(TABLE_SCHEMA_PAGE, &mgr);
+    u8 *page_data = read_page(new_ptkey(mgr.table_name, TABLE_SCHEMA_PAGE));
 
     if (page_data == nullptr)
         throw std::runtime_error("Heapfile of provided name does not exist");
